@@ -26,6 +26,7 @@ Pestaña con texto
 - `background.js` — service worker: traduce y persiste el vocabulario.
 - `content.js` / `content.css` — captura la selección y muestra la burbuja.
 - `sidepanel.html` / `sidepanel.js` / `sidepanel.css` — panel lateral de repaso.
+- `options.html` / `options.js` / `options.css` — página de ajustes (motor de traducción y API keys).
 - `icons/` — iconos placeholder (16/48/128).
 
 ## Instalar en Chrome (modo desarrollador)
@@ -44,12 +45,33 @@ Pestaña con texto
 4. Abre el panel (icono de la extensión) para repasar tu vocabulario; se
    actualiza automáticamente cada vez que guardas una palabra nueva.
 
-## Motor de traducción
+## Motor de traducción (configurable)
 
-Se usa la [MyMemory API](https://mymemory.translated.net/doc/spec.php): gratis y
-sin API key. Tiene un límite diario por IP y funciona mejor con palabras o
-frases cortas. Para cambiar de motor solo hay que editar `traducirConMyMemory`
-en `background.js`; el resto del código no cambia.
+El motor se elige desde la **página de opciones** (icono de la extensión →
+`Ajustes`, o botón "Ajustes" del panel lateral). La configuración se guarda en
+`chrome.storage.sync`. Motores disponibles:
+
+| Motor | API key | Notas |
+| --- | --- | --- |
+| MyMemory | No | Gratis. Límite diario por IP; mejor con frases cortas. |
+| LibreTranslate | Opcional | URL de servidor configurable (público o propio). |
+| Chrome integrado | No | API `Translator` del navegador, offline. Experimental; requiere Chrome reciente. |
+| DeepL | Sí | Selector Free/Pro. Alta calidad. |
+| Google Cloud Translate | Sí | API key de Google Cloud. |
+
+El botón **Probar traducción** de la página de ajustes verifica el motor
+traduciendo la palabra `hello` sin guardarla en el vocabulario.
+
+Internamente, `background.js` lee la config y despacha a una función por motor
+(`traducirMyMemory`, `traducirLibre`, `traducirChrome`, `traducirDeepL`,
+`traducirGoogle`). Añadir un motor nuevo es agregar una función y una entrada en
+el `switch` de `traducir()`.
+
+### Permisos
+
+`manifest.json` declara los hosts de los motores en `host_permissions`. Si en
+LibreTranslate usas una URL distinta a `libretranslate.com`, al guardar Chrome
+pedirá permiso para ese dominio (`optional_host_permissions`).
 
 ## Ideas futuras
 

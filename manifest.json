@@ -4,7 +4,15 @@
   "description": "Selecciona una palabra o frase en inglés, obtén su traducción al español y ve acumulando tu vocabulario para repasarlo.",
   "version": "0.1.0",
   "permissions": ["storage", "sidePanel", "activeTab"],
-  "host_permissions": ["https://api.mymemory.translated.net/*"],
+  "host_permissions": [
+    "https://api.mymemory.translated.net/*",
+    "https://libretranslate.com/*",
+    "https://api-free.deepl.com/*",
+    "https://api.deepl.com/*",
+    "https://translation.googleapis.com/*"
+  ],
+  "optional_host_permissions": ["https://*/*"],
+  "options_page": "options.html",
   "background": {
     "service_worker": "background.js"
   },

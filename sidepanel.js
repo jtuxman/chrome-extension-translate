@@ -8,12 +8,17 @@ const vacio = document.getElementById("vacio");
 const contador = document.getElementById("contador");
 const buscar = document.getElementById("buscar");
 const borrarTodo = document.getElementById("borrarTodo");
+const ajustes = document.getElementById("ajustes");
 
 let vocabularioActual = {};
 
 document.addEventListener("DOMContentLoaded", cargar);
 
 buscar.addEventListener("input", render);
+
+ajustes.addEventListener("click", () => {
+  chrome.runtime.openOptionsPage();
+});
 
 borrarTodo.addEventListener("click", async () => {
   if (confirm("¿Borrar todo tu vocabulario guardado?")) {

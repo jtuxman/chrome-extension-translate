@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ajustes - Aprende Vocabulario</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="contenedor">
+      <h1>Ajustes</h1>
+      <p class="intro">
+        Elige el motor de traducción. Puedes cambiarlo cuando quieras; el resto
+        de la extensión funciona igual.
+      </p>
+
+      <section class="tarjeta">
+        <h2>Motor de traducción</h2>
+        <div class="motores" id="motores">
+          <label class="motor">
+            <input type="radio" name="motor" value="mymemory" />
+            <span class="motor-info">
+              <strong>MyMemory</strong>
+              <small>Gratis, sin API key. Ideal para empezar.</small>
+            </span>
+          </label>
+          <label class="motor">
+            <input type="radio" name="motor" value="libretranslate" />
+            <span class="motor-info">
+              <strong>LibreTranslate</strong>
+              <small>Open-source. Servidor público o propio.</small>
+            </span>
+          </label>
+          <label class="motor">
+            <input type="radio" name="motor" value="chrome" />
+            <span class="motor-info">
+              <strong>Chrome integrado</strong>
+              <small>Traduce offline. Experimental, requiere Chrome reciente.</small>
+            </span>
+          </label>
+          <label class="motor">
+            <input type="radio" name="motor" value="deepl" />
+            <span class="motor-info">
+              <strong>DeepL</strong>
+              <small>Alta calidad. Requiere API key.</small>
+            </span>
+          </label>
+          <label class="motor">
+            <input type="radio" name="motor" value="google" />
+            <span class="motor-info">
+              <strong>Google Cloud Translate</strong>
+              <small>Requiere API key.</small>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <section class="tarjeta">
+        <h2>Idiomas</h2>
+        <div class="campos-inline">
+          <label>
+            Origen
+            <input id="sourceLang" type="text" maxlength="5" value="en" />
+          </label>
+          <label>
+            Destino
+            <input id="targetLang" type="text" maxlength="5" value="es" />
+          </label>
+        </div>
+        <small class="ayuda">Códigos ISO (p. ej. en, es, fr, de).</small>
+      </section>
+
+      <!-- Campos específicos de LibreTranslate -->
+      <section class="tarjeta opciones-motor" data-motor="libretranslate" hidden>
+        <h2>LibreTranslate</h2>
+        <label class="campo">
+          URL del servidor
+          <input
+            id="libreUrl"
+            type="url"
+            placeholder="https://libretranslate.com/translate"
+          />
+        </label>
+        <label class="campo">
+          API key (opcional)
+          <input id="libreApiKey" type="password" placeholder="Si tu servidor la requiere" />
+        </label>
+        <small class="ayuda">
+          Si usas una URL distinta a libretranslate.com, Chrome te pedirá
+          permiso para acceder a ese dominio al guardar.
+        </small>
+      </section>
+
+      <!-- Campos específicos de DeepL -->
+      <section class="tarjeta opciones-motor" data-motor="deepl" hidden>
+        <h2>DeepL</h2>
+        <label class="campo">
+          API key
+          <input id="deeplApiKey" type="password" placeholder="xxxxxxxx:fx" />
+        </label>
+        <label class="campo">
+          Plan
+          <select id="deeplPlan">
+            <option value="free">Free (api-free.deepl.com)</option>
+            <option value="pro">Pro (api.deepl.com)</option>
+          </select>
+        </label>
+      </section>
+
+      <!-- Campos específicos de Google -->
+      <section class="tarjeta opciones-motor" data-motor="google" hidden>
+        <h2>Google Cloud Translate</h2>
+        <label class="campo">
+          API key
+          <input id="googleApiKey" type="password" placeholder="AIza..." />
+        </label>
+      </section>
+
+      <!-- Aviso para Chrome integrado -->
+      <section class="tarjeta opciones-motor" data-motor="chrome" hidden>
+        <h2>Chrome integrado</h2>
+        <p class="ayuda">
+          Usa la API Translator del navegador (sin conexión). Es experimental:
+          necesita una versión reciente de Chrome y puede descargar el modelo de
+          idioma la primera vez. Usa "Probar" para comprobar si está disponible.
+        </p>
+      </section>
+
+      <div class="acciones">
+        <button id="guardar" class="btn-primario">Guardar</button>
+        <button id="probar" class="btn-secundario">Probar traducción</button>
+        <span id="estado" class="estado" role="status"></span>
+      </div>
+    </main>
+
+    <script src="options.js"></script>
+  </body>
+</html>
