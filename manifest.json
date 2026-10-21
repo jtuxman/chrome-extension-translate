@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Aprende Vocabulario - Traductor EN/ES",
+  "description": "Selecciona una palabra o frase en inglés, obtén su traducción al español y ve acumulando tu vocabulario para repasarlo.",
+  "version": "0.1.0",
+  "permissions": ["storage", "sidePanel", "activeTab"],
+  "host_permissions": ["https://api.mymemory.translated.net/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Abrir panel de vocabulario",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mi vocabulario</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header class="cabecera">
+      <h1>Mi vocabulario</h1>
+      <div class="acciones">
+        <span id="contador" class="contador">0 palabras</span>
+        <button id="borrarTodo" class="btn-borrar-todo" title="Borrar todo">
+          Vaciar
+        </button>
+      </div>
+    </header>
+
+    <input
+      id="buscar"
+      class="buscar"
+      type="search"
+      placeholder="Buscar palabra…"
+    />
+
+    <ul id="lista" class="lista"></ul>
+
+    <p id="vacio" class="vacio">
+      Selecciona una palabra en inglés en cualquier página para empezar a
+      construir tu vocabulario.
+    </p>
+
+    <script src="sidepanel.js"></script>
+  </body>
+</html>
