@@ -10,6 +10,7 @@ const buscar = document.getElementById("buscar");
 const borrarTodo = document.getElementById("borrarTodo");
 const ajustes = document.getElementById("ajustes");
 const jugar = document.getElementById("jugar");
+const rachaChip = document.getElementById("racha");
 const exportar = document.getElementById("exportar");
 const importar = document.getElementById("importar");
 const archivoImport = document.getElementById("archivoImport");
@@ -38,11 +39,16 @@ borrarTodo.addEventListener("click", async () => {
   }
 });
 
-// Se actualiza solo cuando el service worker guarda una palabra nueva.
+// Se actualiza solo cuando el service worker guarda una palabra nueva
+// o cuando los juegos actualizan la racha.
 chrome.storage.onChanged.addListener((cambios, area) => {
-  if (area === "local" && cambios[STORAGE_KEY]) {
+  if (area !== "local") return;
+  if (cambios[STORAGE_KEY]) {
     vocabularioActual = cambios[STORAGE_KEY].newValue || {};
     render();
+  }
+  if (cambios.racha) {
+    mostrarRacha();
   }
 });
 
@@ -50,6 +56,28 @@ async function cargar() {
   const almacen = await chrome.storage.local.get(STORAGE_KEY);
   vocabularioActual = almacen[STORAGE_KEY] || {};
   render();
+  mostrarRacha();
+}
+
+async function mostrarRacha() {
+  const { racha } = await chrome.storage.local.get("racha");
+  const r = racha || { ultimaFecha: null, dias: 0 };
+
+  const d = new Date();
+  const hoy = fechaLocal(d);
+  const ayer = fechaLocal(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  const dias = r.ultimaFecha === hoy || r.ultimaFecha === ayer ? r.dias : 0;
+
+  rachaChip.textContent = "🔥 " + dias;
+  rachaChip.title =
+    "Días seguidos practicando" + (r.mejor ? " · récord: " + r.mejor : "");
+}
+
+function fechaLocal(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return y + "-" + m + "-" + dia;
 }
 
 function render() {

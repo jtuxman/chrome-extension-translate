@@ -43,6 +43,13 @@ body {
   padding: 4px 10px;
 }
 
+.stats .racha {
+  background: #fff6ed;
+  border-color: #fddcab;
+  color: #b93815;
+  font-weight: 600;
+}
+
 .intro {
   color: #667085;
   margin: 0 0 16px;
@@ -84,6 +91,32 @@ body {
 
 .modo small {
   color: #667085;
+}
+
+.direccion {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #eaecf0;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #475467;
+}
+
+.direccion-label {
+  font-weight: 600;
+  color: #344054;
+}
+
+.direccion label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
 }
 
 .solo-pendientes {
@@ -336,6 +369,13 @@ body {
 .resumen {
   color: #475467;
   font-size: 16px;
+  margin: 0 0 8px;
+}
+
+.resumen-racha {
+  color: #b93815;
+  font-size: 15px;
+  font-weight: 600;
   margin: 0 0 20px;
 }
 

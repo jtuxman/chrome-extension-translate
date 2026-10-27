@@ -11,6 +11,7 @@
       <header class="cabecera">
         <h1>Juegos de vocabulario</h1>
         <div class="stats">
+          <span id="statRacha" class="racha" title="Días seguidos practicando">🔥 0</span>
           <span id="statTotal">0 palabras</span>
           <span id="statPendientes">0 por repasar</span>
         </div>
@@ -35,6 +36,18 @@
             <small>Escribe la traducción de la palabra.</small>
           </button>
         </div>
+        <div class="direccion">
+          <span class="direccion-label">Dirección:</span>
+          <label>
+            <input type="radio" name="direccion" value="en-es" checked />
+            Inglés → Español
+          </label>
+          <label>
+            <input type="radio" name="direccion" value="es-en" />
+            Español → Inglés
+          </label>
+        </div>
+
         <label class="solo-pendientes">
           <input type="checkbox" id="soloPendientes" checked />
           Practicar solo las palabras que tocan hoy (repetición espaciada)
@@ -66,6 +79,7 @@
       <section id="resultados" class="resultados" hidden>
         <h2>¡Ronda completada!</h2>
         <p id="resumen" class="resumen"></p>
+        <p id="resumenRacha" class="resumen-racha"></p>
         <div class="acciones-fin">
           <button id="jugarOtra" class="btn-primario">Jugar otra ronda</button>
           <button id="volverMenu" class="btn-secundario">Volver al menú</button>

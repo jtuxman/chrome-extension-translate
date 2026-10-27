@@ -18,12 +18,15 @@ let indice = 0;
 let aciertos = 0;
 let fallos = 0;
 let modoActual = "flashcards";
+let direccion = "en-es"; // "en-es" (inglés→español) o "es-en" (inverso)
 
 // --- Referencias DOM --------------------------------------------------------
 
 const el = {
   statTotal: document.getElementById("statTotal"),
   statPendientes: document.getElementById("statPendientes"),
+  statRacha: document.getElementById("statRacha"),
+  resumenRacha: document.getElementById("resumenRacha"),
   menu: document.getElementById("menu"),
   juego: document.getElementById("juego"),
   resultados: document.getElementById("resultados"),
@@ -54,7 +57,29 @@ async function init() {
   el.volverMenu.addEventListener("click", irAlMenu);
   el.jugarOtra.addEventListener("click", () => empezar(modoActual));
 
+  document.querySelectorAll('input[name="direccion"]').forEach((r) => {
+    r.addEventListener("change", () => {
+      direccion = r.value;
+    });
+  });
+
   actualizarStats();
+  await mostrarRacha();
+}
+
+function direccionSeleccionada() {
+  const r = document.querySelector('input[name="direccion"]:checked');
+  return r ? r.value : "en-es";
+}
+
+// Devuelve el texto que se muestra (la pregunta) según la dirección.
+function textoPregunta(item) {
+  return direccion === "en-es" ? item.palabra : item.traduccion;
+}
+
+// Devuelve el texto correcto (la respuesta) según la dirección.
+function textoRespuesta(item) {
+  return direccion === "en-es" ? item.traduccion : item.palabra;
 }
 
 async function cargarVocabulario() {
@@ -86,6 +111,7 @@ function actualizarStats() {
 
 function empezar(modo) {
   modoActual = modo;
+  direccion = direccionSeleccionada();
 
   const base = el.soloPendientes.checked ? itemsPendientes() : listaItems();
   const fuente = base.length > 0 ? base : listaItems();
@@ -129,7 +155,7 @@ function renderFlashcard(item) {
 
   const palabra = document.createElement("div");
   palabra.className = "palabra-grande";
-  palabra.textContent = item.palabra;
+  palabra.textContent = textoPregunta(item);
   el.tarjeta.appendChild(palabra);
 
   if (item.contexto) {
@@ -141,7 +167,7 @@ function renderFlashcard(item) {
 
   const respuesta = document.createElement("div");
   respuesta.className = "respuesta-oculta";
-  respuesta.textContent = item.traduccion;
+  respuesta.textContent = textoRespuesta(item);
   respuesta.hidden = true;
   el.tarjeta.appendChild(respuesta);
 
@@ -179,10 +205,11 @@ function renderOpcionMultiple(item) {
 
   const palabra = document.createElement("div");
   palabra.className = "palabra-grande";
-  palabra.textContent = item.palabra;
+  palabra.textContent = textoPregunta(item);
   el.tarjeta.appendChild(palabra);
 
-  const opciones = generarOpciones(item);
+  const correcta = textoRespuesta(item);
+  const opciones = generarOpciones(item, correcta);
   const cont = document.createElement("div");
   cont.className = "opciones";
 
@@ -191,14 +218,14 @@ function renderOpcionMultiple(item) {
     btn.className = "opcion-btn";
     btn.textContent = texto;
     btn.addEventListener("click", () => {
-      const correcto = texto === item.traduccion;
+      const acierto = texto === correcta;
       // Marcar visualmente.
       cont.querySelectorAll(".opcion-btn").forEach((b) => {
         b.disabled = true;
-        if (b.textContent === item.traduccion) b.classList.add("correcta");
+        if (b.textContent === correcta) b.classList.add("correcta");
         else if (b === btn) b.classList.add("incorrecta");
       });
-      setTimeout(() => resolver(item, correcto), 900);
+      setTimeout(() => resolver(item, acierto), 900);
     });
     cont.appendChild(btn);
   });
@@ -206,11 +233,11 @@ function renderOpcionMultiple(item) {
   el.tarjeta.appendChild(cont);
 }
 
-function generarOpciones(item) {
+function generarOpciones(item, correcta) {
   const distractores = mezclar(
     listaItems()
-      .filter((it) => it.traduccion && it.traduccion !== item.traduccion)
-      .map((it) => it.traduccion)
+      .map((it) => textoRespuesta(it))
+      .filter((t) => t && t !== correcta)
   );
 
   const unicos = [];
@@ -219,7 +246,7 @@ function generarOpciones(item) {
     if (unicos.length >= 3) break;
   }
 
-  return mezclar([item.traduccion, ...unicos]);
+  return mezclar([correcta, ...unicos]);
 }
 
 // --- Modo: Escribir ---------------------------------------------------------
@@ -229,7 +256,7 @@ function renderEscribir(item) {
 
   const palabra = document.createElement("div");
   palabra.className = "palabra-grande";
-  palabra.textContent = item.palabra;
+  palabra.textContent = textoPregunta(item);
   el.tarjeta.appendChild(palabra);
 
   const form = document.createElement("form");
@@ -251,16 +278,17 @@ function renderEscribir(item) {
   feedback.className = "feedback";
   feedback.hidden = true;
 
+  const esperado = textoRespuesta(item);
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    const correcto = normalizar(input.value) === normalizar(item.traduccion);
+    const correcto = normalizar(input.value) === normalizar(esperado);
     input.disabled = true;
     btn.disabled = true;
     feedback.hidden = false;
     feedback.className = "feedback " + (correcto ? "ok" : "mal");
     feedback.textContent = correcto
       ? "¡Correcto!"
-      : 'Respuesta: "' + item.traduccion + '"';
+      : 'Respuesta: "' + esperado + '"';
     setTimeout(() => resolver(item, correcto), correcto ? 700 : 1400);
   });
 
@@ -322,13 +350,66 @@ async function actualizarSR(item, correcto) {
 
 // --- Fin de ronda -----------------------------------------------------------
 
-function terminar() {
+async function terminar() {
   const total = ronda.length;
   const pct = total ? Math.round((aciertos / total) * 100) : 0;
   el.resumen.textContent =
     "Acertaste " + aciertos + " de " + total + " (" + pct + "%).";
+
+  const racha = await registrarRacha();
+  el.resumenRacha.textContent =
+    racha.dias === 1
+      ? "🔥 ¡Empiezas una racha! Día 1."
+      : "🔥 Racha de " + racha.dias + " días seguidos. ¡Sigue así!";
+  await mostrarRacha();
+
   mostrarSeccion("resultados");
   actualizarStats();
+}
+
+// --- Racha diaria -----------------------------------------------------------
+
+function fechaLocal(d) {
+  // YYYY-MM-DD en hora local.
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return y + "-" + m + "-" + dia;
+}
+
+async function registrarRacha() {
+  const { racha } = await chrome.storage.local.get("racha");
+  const r = racha || { ultimaFecha: null, dias: 0, mejor: 0 };
+
+  const hoy = fechaLocal(new Date());
+  const ayer = fechaLocal(new Date(Date.now() - DIA_MS));
+
+  if (r.ultimaFecha === hoy) {
+    // Ya se contó la práctica de hoy; no cambia la racha.
+    return r;
+  }
+
+  r.dias = r.ultimaFecha === ayer ? (r.dias || 0) + 1 : 1;
+  r.ultimaFecha = hoy;
+  if (r.dias > (r.mejor || 0)) r.mejor = r.dias;
+
+  await chrome.storage.local.set({ racha: r });
+  return r;
+}
+
+async function mostrarRacha() {
+  const { racha } = await chrome.storage.local.get("racha");
+  const r = racha || { ultimaFecha: null, dias: 0 };
+
+  // Si la última práctica no fue hoy ni ayer, la racha visible es 0.
+  const hoy = fechaLocal(new Date());
+  const ayer = fechaLocal(new Date(Date.now() - DIA_MS));
+  const dias = r.ultimaFecha === hoy || r.ultimaFecha === ayer ? r.dias : 0;
+
+  el.statRacha.textContent = "🔥 " + dias;
+  el.statRacha.title =
+    "Días seguidos practicando" +
+    (r.mejor ? " · récord: " + r.mejor : "");
 }
 
 function irAlMenu() {

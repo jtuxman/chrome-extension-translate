@@ -35,6 +35,16 @@ body {
   color: #667085;
 }
 
+.racha-chip {
+  font-size: 12px;
+  font-weight: 600;
+  color: #b93815;
+  background: #fff6ed;
+  border: 1px solid #fddcab;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
 .btn-jugar {
   border: none;
   background: #6941c6;

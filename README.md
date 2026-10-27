@@ -51,10 +51,15 @@ Pestaña con texto
 Desde el panel lateral, el botón **Jugar** abre `juego.html` (en una pestaña
 nueva). Los juegos usan las palabras que ya tienes guardadas:
 
-- **Flashcards:** ves la palabra en inglés, piensas la traducción y la revelas.
+- **Flashcards:** ves la palabra y revelas la traducción.
 - **Opción múltiple:** eliges la traducción correcta entre varias (los
   distractores salen de tu propio vocabulario).
 - **Escribir:** escribes la traducción (se ignoran mayúsculas y acentos).
+
+Puedes elegir la **dirección**: Inglés → Español (por defecto) o el modo
+inverso Español → Inglés. También hay una **racha diaria** (🔥): cuenta los días
+seguidos que practicas y se reinicia si te saltas un día; se muestra en el panel
+lateral y en la pantalla de juegos.
 
 Incluye **repetición espaciada** (sistema Leitner): cada acierto sube el nivel
 de la palabra y espacia su próximo repaso (0, 1, 3, 7, 14, 30 días); un fallo la
