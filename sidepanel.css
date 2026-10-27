@@ -35,6 +35,21 @@ body {
   color: #667085;
 }
 
+.btn-jugar {
+  border: none;
+  background: #6941c6;
+  color: #fff;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.btn-jugar:hover {
+  background: #5a37a8;
+}
+
 .btn-ajustes {
   border: 1px solid #d9dee5;
   background: #fff;
@@ -149,4 +164,29 @@ body {
   font-size: 13px;
   line-height: 1.5;
   margin-top: 16px;
+}
+
+.pie {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #eaecf0;
+}
+
+.btn-pie {
+  flex: 1;
+  border: 1px solid #d9dee5;
+  background: #fff;
+  color: #475467;
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn-pie:hover {
+  background: #f2f4f7;
+  border-color: #d6bbfb;
+  color: #6941c6;
 }

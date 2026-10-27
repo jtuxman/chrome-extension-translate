@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Juegos - Aprende Vocabulario</title>
+    <link rel="stylesheet" href="juego.css" />
+  </head>
+  <body>
+    <main class="contenedor">
+      <header class="cabecera">
+        <h1>Juegos de vocabulario</h1>
+        <div class="stats">
+          <span id="statTotal">0 palabras</span>
+          <span id="statPendientes">0 por repasar</span>
+        </div>
+      </header>
+
+      <!-- Selección de modo -->
+      <section id="menu" class="menu">
+        <p class="intro">
+          Practica con las palabras que has ido guardando. Elige un modo:
+        </p>
+        <div class="modos">
+          <button class="modo" data-modo="flashcards">
+            <strong>Flashcards</strong>
+            <small>Mira la palabra y recuerda su traducción.</small>
+          </button>
+          <button class="modo" data-modo="opcion">
+            <strong>Opción múltiple</strong>
+            <small>Elige la traducción correcta entre varias.</small>
+          </button>
+          <button class="modo" data-modo="escribir">
+            <strong>Escribir</strong>
+            <small>Escribe la traducción de la palabra.</small>
+          </button>
+        </div>
+        <label class="solo-pendientes">
+          <input type="checkbox" id="soloPendientes" checked />
+          Practicar solo las palabras que tocan hoy (repetición espaciada)
+        </label>
+        <p id="avisoVacio" class="aviso" hidden>
+          Aún no tienes palabras guardadas. Selecciona palabras en inglés
+          mientras lees para empezar a jugar.
+        </p>
+      </section>
+
+      <!-- Área de juego -->
+      <section id="juego" class="juego" hidden>
+        <div class="barra">
+          <button id="salir" class="btn-salir">← Salir</button>
+          <div class="progreso">
+            <span id="progresoTexto">1 / 10</span>
+            <div class="barra-progreso"><div id="barraFill"></div></div>
+          </div>
+          <div class="marcador">
+            <span id="aciertos" class="ok">0</span> /
+            <span id="fallos" class="mal">0</span>
+          </div>
+        </div>
+
+        <div id="tarjeta" class="tarjeta"></div>
+      </section>
+
+      <!-- Resultados -->
+      <section id="resultados" class="resultados" hidden>
+        <h2>¡Ronda completada!</h2>
+        <p id="resumen" class="resumen"></p>
+        <div class="acciones-fin">
+          <button id="jugarOtra" class="btn-primario">Jugar otra ronda</button>
+          <button id="volverMenu" class="btn-secundario">Volver al menú</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="juego.js"></script>
+  </body>
+</html>

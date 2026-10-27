@@ -11,6 +11,9 @@
       <h1>Mi vocabulario</h1>
       <div class="acciones">
         <span id="contador" class="contador">0 palabras</span>
+        <button id="jugar" class="btn-jugar" title="Jugar">
+          Jugar
+        </button>
         <button id="ajustes" class="btn-ajustes" title="Ajustes">
           Ajustes
         </button>
@@ -33,6 +36,12 @@
       Selecciona una palabra en inglés en cualquier página para empezar a
       construir tu vocabulario.
     </p>
+
+    <footer class="pie">
+      <button id="exportar" class="btn-pie">Exportar JSON</button>
+      <button id="importar" class="btn-pie">Importar JSON</button>
+      <input id="archivoImport" type="file" accept="application/json" hidden />
+    </footer>
 
     <script src="sidepanel.js"></script>
   </body>

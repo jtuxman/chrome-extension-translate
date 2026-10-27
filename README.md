@@ -25,8 +25,9 @@ Pestaña con texto
 - `manifest.json` — configuración y permisos de la extensión.
 - `background.js` — service worker: traduce y persiste el vocabulario.
 - `content.js` / `content.css` — captura la selección y muestra la burbuja.
-- `sidepanel.html` / `sidepanel.js` / `sidepanel.css` — panel lateral de repaso.
+- `sidepanel.html` / `sidepanel.js` / `sidepanel.css` — panel lateral de repaso (con Jugar, Ajustes, exportar/importar).
 - `options.html` / `options.js` / `options.css` — página de ajustes (motor de traducción y API keys).
+- `juego.html` / `juego.js` / `juego.css` — juegos de vocabulario (flashcards, opción múltiple, escribir).
 - `icons/` — iconos placeholder (16/48/128).
 
 ## Instalar en Chrome (modo desarrollador)
@@ -44,6 +45,30 @@ Pestaña con texto
 3. Aparecerá una burbuja con la traducción y se guardará en el panel lateral.
 4. Abre el panel (icono de la extensión) para repasar tu vocabulario; se
    actualiza automáticamente cada vez que guardas una palabra nueva.
+
+## Juegos de vocabulario
+
+Desde el panel lateral, el botón **Jugar** abre `juego.html` (en una pestaña
+nueva). Los juegos usan las palabras que ya tienes guardadas:
+
+- **Flashcards:** ves la palabra en inglés, piensas la traducción y la revelas.
+- **Opción múltiple:** eliges la traducción correcta entre varias (los
+  distractores salen de tu propio vocabulario).
+- **Escribir:** escribes la traducción (se ignoran mayúsculas y acentos).
+
+Incluye **repetición espaciada** (sistema Leitner): cada acierto sube el nivel
+de la palabra y espacia su próximo repaso (0, 1, 3, 7, 14, 30 días); un fallo la
+devuelve al nivel 0. Por defecto el juego prioriza las palabras que "tocan hoy".
+Estos datos (`nivel`, `aciertos`, `fallos`, `proximoRepaso`) se guardan junto a
+cada palabra en `chrome.storage.local`.
+
+## Copia de seguridad (exportar / importar)
+
+En el pie del panel lateral:
+
+- **Exportar JSON:** descarga todo tu vocabulario como `vocabulario-FECHA.json`.
+- **Importar JSON:** carga un archivo exportado; se fusiona con lo existente
+  (acepta tanto el formato objeto como un array de palabras).
 
 ## Motor de traducción (configurable)
 

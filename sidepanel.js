@@ -9,6 +9,10 @@ const contador = document.getElementById("contador");
 const buscar = document.getElementById("buscar");
 const borrarTodo = document.getElementById("borrarTodo");
 const ajustes = document.getElementById("ajustes");
+const jugar = document.getElementById("jugar");
+const exportar = document.getElementById("exportar");
+const importar = document.getElementById("importar");
+const archivoImport = document.getElementById("archivoImport");
 
 let vocabularioActual = {};
 
@@ -19,6 +23,14 @@ buscar.addEventListener("input", render);
 ajustes.addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
 });
+
+jugar.addEventListener("click", () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL("juego.html") });
+});
+
+exportar.addEventListener("click", exportarJSON);
+importar.addEventListener("click", () => archivoImport.click());
+archivoImport.addEventListener("change", importarJSON);
 
 borrarTodo.addEventListener("click", async () => {
   if (confirm("¿Borrar todo tu vocabulario guardado?")) {
@@ -134,4 +146,75 @@ async function borrarItem(palabra) {
   const vocabulario = almacen[STORAGE_KEY] || {};
   delete vocabulario[clave];
   await chrome.storage.local.set({ [STORAGE_KEY]: vocabulario });
+}
+
+// --- Exportar / Importar ----------------------------------------------------
+
+function exportarJSON() {
+  const datos = JSON.stringify(vocabularioActual, null, 2);
+  const blob = new Blob([datos], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const fecha = new Date().toISOString().slice(0, 10);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "vocabulario-" + fecha + ".json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function importarJSON(evento) {
+  const archivo = evento.target.files && evento.target.files[0];
+  if (!archivo) return;
+
+  try {
+    const texto = await archivo.text();
+    const datos = JSON.parse(texto);
+    const importado = normalizarImportado(datos);
+
+    // Fusionar con lo existente: si la palabra ya existe, suma vecesVista.
+    const fusionado = { ...vocabularioActual };
+    for (const [clave, item] of Object.entries(importado)) {
+      if (fusionado[clave]) {
+        fusionado[clave].vecesVista =
+          (fusionado[clave].vecesVista || 1) + (item.vecesVista || 1);
+      } else {
+        fusionado[clave] = item;
+      }
+    }
+
+    await chrome.storage.local.set({ [STORAGE_KEY]: fusionado });
+    alert("Vocabulario importado correctamente.");
+  } catch (e) {
+    alert("No se pudo importar el archivo: " + e.message);
+  } finally {
+    evento.target.value = ""; // permitir reimportar el mismo archivo
+  }
+}
+
+// Acepta tanto el formato objeto { clave: item } como un array de items.
+function normalizarImportado(datos) {
+  const resultado = {};
+  const items = Array.isArray(datos) ? datos : Object.values(datos);
+
+  for (const item of items) {
+    if (!item || !item.palabra) continue;
+    const clave = String(item.palabra).toLowerCase();
+    resultado[clave] = {
+      palabra: item.palabra,
+      traduccion: item.traduccion || "",
+      contexto: item.contexto || "",
+      url: item.url || "",
+      fecha: item.fecha || new Date().toISOString(),
+      ultimaVez: item.ultimaVez || item.fecha || new Date().toISOString(),
+      vecesVista: item.vecesVista || 1,
+      nivel: item.nivel || 0,
+      aciertos: item.aciertos || 0,
+      fallos: item.fallos || 0,
+      proximoRepaso: item.proximoRepaso || null,
+    };
+  }
+  return resultado;
 }
