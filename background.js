@@ -12,6 +12,31 @@ const CONFIG_POR_DEFECTO = {
   google: { apiKey: "" },
 };
 
+// Canal con el documento offscreen que ejecuta el OCR.
+let puertoOcr = null;
+const pendientesOcr = new Map();
+
+chrome.runtime.onConnect.addListener((puerto) => {
+  if (!puerto || puerto.name !== "ocr") return;
+  puertoOcr = puerto;
+
+  puerto.onMessage.addListener((mensaje) => {
+    if (!mensaje || !pendientesOcr.has(mensaje.id)) return;
+    const pendiente = pendientesOcr.get(mensaje.id);
+    pendientesOcr.delete(mensaje.id);
+    pendiente.resolve(mensaje);
+  });
+
+  puerto.onDisconnect.addListener(() => {
+    if (puertoOcr === puerto) puertoOcr = null;
+    for (const [id, pendiente] of pendientesOcr) {
+      if (pendiente.puerto !== puerto) continue;
+      pendientesOcr.delete(id);
+      pendiente.reject(new Error("Se interrumpió la lectura del recuadro"));
+    }
+  });
+});
+
 // Abrir el panel lateral al hacer clic en el icono de la extensión.
 chrome.runtime.onInstalled.addListener(() => {
   if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
@@ -37,6 +62,16 @@ chrome.runtime.onMessage.addListener((mensaje, sender, sendResponse) => {
     manejarPrueba(mensaje)
       .then((resultado) => sendResponse(resultado))
       .catch((error) => sendResponse({ ok: false, error: String(error) }));
+    return true; // respuesta asíncrona
+  }
+
+  if (mensaje && mensaje.tipo === "reconocer") {
+    manejarReconocimiento(mensaje, sender)
+      .then((resultado) => sendResponse(resultado))
+      .catch((error) => {
+        console.error("Error al reconocer:", error);
+        sendResponse({ ok: false, error: String(error.message || error) });
+      });
     return true; // respuesta asíncrona
   }
 
@@ -262,4 +297,173 @@ async function guardarEnVocabulario({ texto, traduccion, contexto, url }) {
   }
 
   await chrome.storage.local.set({ [STORAGE_KEY]: vocabulario });
+}
+
+// --- Texto dentro de un recorte de pantalla --------------------------------
+
+async function manejarReconocimiento(mensaje, sender) {
+  const rect = mensaje.rect;
+  const viewport = mensaje.viewport;
+  if (!rect || rect.width < 2 || rect.height < 2) {
+    return { ok: false, error: "Recuadro demasiado pequeño" };
+  }
+  if (!viewport || !viewport.width || !viewport.height) {
+    return { ok: false, error: "No se pudo medir la pantalla" };
+  }
+  if (!sender || !sender.tab) {
+    return { ok: false, error: "No hay pestaña activa" };
+  }
+
+  let captura;
+  try {
+    captura = await chrome.tabs.captureVisibleTab(sender.tab.windowId, {
+      format: "png",
+    });
+  } catch (error) {
+    throw new Error("No se pudo capturar la pantalla: " + (error.message || error));
+  }
+
+  const recorte = await recortarCaptura(captura, rect, viewport);
+  const texto = await reconocerEnOffscreen(recorte, rect.height);
+  const limpio = limpiarTextoOcr(texto);
+  if (!limpio) return { ok: false, error: "No se encontró texto en el recuadro" };
+  return { ok: true, texto: limpio };
+}
+
+function limpiarTextoOcr(texto) {
+  const limpio = String(texto || "")
+    .replace(/[\u0000-\u001f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!limpio || !/[0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(limpio)) return "";
+  return limpio.slice(0, 500);
+}
+
+async function recortarCaptura(dataUrl, rect, viewport) {
+  const respuesta = await fetch(dataUrl);
+  if (!respuesta.ok) throw new Error("No se pudo leer la captura");
+  const bitmap = await createImageBitmap(await respuesta.blob());
+  try {
+    if (!bitmap.width || !bitmap.height) {
+      throw new Error("La captura llegó vacía");
+    }
+    const escalaX = bitmap.width / viewport.width;
+    const escalaY = bitmap.height / viewport.height;
+    const sx = acotar(Math.round(rect.x * escalaX), 0, bitmap.width - 1);
+    const sy = acotar(Math.round(rect.y * escalaY), 0, bitmap.height - 1);
+    const sw = acotar(Math.round(rect.width * escalaX), 1, bitmap.width - sx);
+    const sh = acotar(Math.round(rect.height * escalaY), 1, bitmap.height - sy);
+
+    let dw = sw;
+    let dh = sh;
+    const ladoLargo = Math.max(sw, sh);
+    if (ladoLargo < 900) {
+      const factor = Math.min(3, 900 / ladoLargo);
+      dw = Math.max(1, Math.round(sw * factor));
+      dh = Math.max(1, Math.round(sh * factor));
+    }
+    if (dw > 1600) {
+      const factor = 1600 / dw;
+      dw = 1600;
+      dh = Math.max(1, Math.round(dh * factor));
+    }
+
+    const canvas = new OffscreenCanvas(dw, dh);
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, dw, dh);
+    const blob = await canvas.convertToBlob({ type: "image/png" });
+    if (!blob) throw new Error("No se pudo recortar la captura");
+    return await blobADataUrl(blob);
+  } finally {
+    bitmap.close();
+  }
+}
+
+function acotar(valor, min, max) {
+  return Math.min(max, Math.max(min, valor));
+}
+
+async function blobADataUrl(blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const partes = [];
+  const bloque = 8192;
+  for (let i = 0; i < bytes.length; i += bloque) {
+    const trozo = bytes.subarray(i, i + bloque);
+    let binario = "";
+    for (let j = 0; j < trozo.length; j++) binario += String.fromCharCode(trozo[j]);
+    partes.push(binario);
+  }
+  return "data:image/png;base64," + btoa(partes.join(""));
+}
+
+let asegurandoOffscreen = null;
+
+async function asegurarOffscreen() {
+  if (!chrome.offscreen) {
+    throw new Error("Esta versión de Chrome no puede leer texto en imágenes.");
+  }
+  if (await chrome.offscreen.hasDocument()) return;
+  if (!asegurandoOffscreen) {
+    asegurandoOffscreen = chrome.offscreen
+      .createDocument({
+        url: "ocr.html",
+        reasons: ["WORKERS"],
+        justification:
+          "Reconocer el texto dentro de una captura de pantalla para traducirlo.",
+      })
+      .finally(() => {
+        asegurandoOffscreen = null;
+      });
+  }
+  try {
+    await asegurandoOffscreen;
+  } catch (error) {
+    if (!(await chrome.offscreen.hasDocument())) throw error;
+  }
+}
+
+async function reconocerEnOffscreen(dataUrl, alto) {
+  await asegurarOffscreen();
+  const inicio = Date.now();
+  while (!puertoOcr && Date.now() - inicio < 5000) {
+    await esperar(50);
+  }
+  if (!puertoOcr) throw new Error("El lector de imágenes no respondió");
+
+  const id = Math.random().toString(36).slice(2);
+  const puerto = puertoOcr;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      if (!pendientesOcr.has(id)) return;
+      pendientesOcr.delete(id);
+      reject(new Error("Tiempo agotado al leer el recuadro"));
+    }, 40000);
+
+    pendientesOcr.set(id, {
+      puerto,
+      resolve: (mensaje) => {
+        clearTimeout(timer);
+        if (mensaje && mensaje.ok) resolve(mensaje.texto || "");
+        else reject(new Error((mensaje && mensaje.error) || "No se pudo leer el texto"));
+      },
+      reject: (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    });
+
+    try {
+      puerto.postMessage({ tipo: "ocr-imagen", id, dataUrl, alto });
+    } catch (error) {
+      clearTimeout(timer);
+      pendientesOcr.delete(id);
+      reject(error);
+    }
+  });
+}
+
+function esperar(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

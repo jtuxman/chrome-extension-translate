@@ -44,3 +44,29 @@
 .avoc-traduccion {
   color: #1f2933;
 }
+
+/* Recorte con Control: el cursor avisa el modo y el rectángulo marca la zona. */
+html.avoc-modo-recorte,
+html.avoc-modo-recorte * {
+  cursor: crosshair !important;
+}
+
+html.avoc-arrastrando,
+html.avoc-arrastrando * {
+  user-select: none !important;
+}
+
+.avoc-capa {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  pointer-events: none;
+}
+
+.avoc-rect {
+  position: fixed;
+  box-sizing: border-box;
+  border: 2px solid #6941c6;
+  background: rgba(105, 65, 198, 0.16);
+  border-radius: 2px;
+}
