@@ -1,3 +1,5 @@
+importScripts("drive.js");
+
 // Service worker: coordina la traducción (según el motor configurado) y
 // persiste el vocabulario.
 
@@ -44,6 +46,7 @@ chrome.runtime.onInstalled.addListener(() => {
       .setPanelBehavior({ openPanelOnActionClick: true })
       .catch((err) => console.warn("No se pudo configurar el panel:", err));
   }
+  sincronizarDrive().catch((error) => console.warn("Drive:", error));
 });
 
 // Escucha los mensajes del content script y de la página de opciones.
@@ -63,6 +66,20 @@ chrome.runtime.onMessage.addListener((mensaje, sender, sendResponse) => {
       .then((resultado) => sendResponse(resultado))
       .catch((error) => sendResponse({ ok: false, error: String(error) }));
     return true; // respuesta asíncrona
+  }
+
+  if (mensaje && mensaje.tipo === "drive-estado") {
+    estadoDrive()
+      .then((resultado) => sendResponse(resultado))
+      .catch((error) => responderErrorDrive(error, sendResponse));
+    return true;
+  }
+
+  if (mensaje && mensaje.tipo === "drive-sincronizar") {
+    sincronizarDrive()
+      .then((resultado) => sendResponse(resultado))
+      .catch((error) => responderErrorDrive(error, sendResponse));
+    return true;
   }
 
   if (mensaje && mensaje.tipo === "reconocer") {

@@ -156,12 +156,13 @@ body {
 
 .btn-borrar {
   margin-left: auto;
-  border: none;
-  background: transparent;
-  color: #98a2b3;
+  border: 1px solid #fecdca;
+  background: #fff;
+  color: #b42318;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 11px;
-  padding: 0;
+  padding: 2px 8px;
 }
 
 .btn-borrar:hover {
@@ -178,10 +179,28 @@ body {
 
 .pie {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 10px;
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid #eaecf0;
+}
+
+.pie-fila,
+.drive-botones {
+  display: flex;
+  gap: 8px;
+}
+
+.drive-estado {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #475467;
+}
+
+.drive-estado.error {
+  color: #b42318;
 }
 
 .btn-pie {

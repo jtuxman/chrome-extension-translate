@@ -14,10 +14,14 @@ const rachaChip = document.getElementById("racha");
 const exportar = document.getElementById("exportar");
 const importar = document.getElementById("importar");
 const archivoImport = document.getElementById("archivoImport");
+const driveEstado = document.getElementById("driveEstado");
 
 let vocabularioActual = {};
 
-document.addEventListener("DOMContentLoaded", cargar);
+document.addEventListener("DOMContentLoaded", () => {
+  cargar();
+  prepararDrive();
+});
 
 buscar.addEventListener("input", render);
 
@@ -34,9 +38,13 @@ importar.addEventListener("click", () => archivoImport.click());
 archivoImport.addEventListener("change", importarJSON);
 
 borrarTodo.addEventListener("click", async () => {
-  if (confirm("¿Borrar todo tu vocabulario guardado?")) {
-    await chrome.storage.local.set({ [STORAGE_KEY]: {} });
-  }
+  if (!confirm("¿Borrar todo tu vocabulario guardado?")) return;
+  const almacen = await chrome.storage.local.get([STORAGE_KEY, "eliminadas"]);
+  const vocabulario = almacen[STORAGE_KEY] || {};
+  const eliminadas = almacen.eliminadas || {};
+  const ahora = new Date().toISOString();
+  for (const clave of Object.keys(vocabulario)) eliminadas[clave] = ahora;
+  await chrome.storage.local.set({ [STORAGE_KEY]: {}, eliminadas });
 });
 
 // Se actualiza solo cuando el service worker guarda una palabra nueva
@@ -156,7 +164,8 @@ function crearItem(it) {
 
   const borrar = document.createElement("button");
   borrar.className = "btn-borrar";
-  borrar.textContent = "borrar";
+  borrar.type = "button";
+  borrar.textContent = "Eliminar";
   borrar.addEventListener("click", () => borrarItem(it.palabra));
   meta.appendChild(borrar);
 
@@ -169,11 +178,47 @@ function resaltarContexto(contexto, palabra) {
 }
 
 async function borrarItem(palabra) {
-  const clave = (palabra || "").toLowerCase();
-  const almacen = await chrome.storage.local.get(STORAGE_KEY);
+  const visible = palabra || "";
+  if (!confirm("¿Eliminar «" + visible + "» del diccionario?")) return;
+  const clave = visible.toLowerCase();
+  const almacen = await chrome.storage.local.get([STORAGE_KEY, "eliminadas"]);
   const vocabulario = almacen[STORAGE_KEY] || {};
+  const eliminadas = almacen.eliminadas || {};
   delete vocabulario[clave];
-  await chrome.storage.local.set({ [STORAGE_KEY]: vocabulario });
+  eliminadas[clave] = new Date().toISOString();
+  await chrome.storage.local.set({ [STORAGE_KEY]: vocabulario, eliminadas });
+}
+
+function enviarDrive(mensaje) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(mensaje, (respuesta) => {
+      if (chrome.runtime.lastError) {
+        resolve({ ok: false, error: chrome.runtime.lastError.message });
+        return;
+      }
+      resolve(respuesta || { ok: false, error: "Sin respuesta de la extensión" });
+    });
+  });
+}
+
+async function prepararDrive() {
+  const resultado = await enviarDrive({ tipo: "drive-sincronizar" });
+  pintarDrive(resultado);
+}
+
+function pintarDrive(estado) {
+  estado = estado || {};
+  if (estado.ok === false) {
+    driveEstado.textContent = estado.error || "No se pudo sincronizar";
+    driveEstado.classList.add("error");
+    return;
+  }
+  driveEstado.classList.remove("error");
+  const cuenta = estado.email ? " (" + estado.email + ")" : "";
+  driveEstado.textContent =
+    "Sincronizado con la cuenta de Google de Chrome" +
+    cuenta +
+    ". En otra computadora, abre Chrome con esa misma cuenta.";
 }
 
 // --- Exportar / Importar ----------------------------------------------------
