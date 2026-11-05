@@ -311,6 +311,10 @@
         }
         if (respuesta && respuesta.ok) {
           actualizarBurbuja(respuesta.traduccion, texto);
+          const aCopiar = respuesta.textoCopiar || respuesta.traduccion;
+          copiarAlPortapapeles(aCopiar).then((copiado) => {
+            if (copiado && id === solicitud) marcarCopiado(respuesta.esEspanol);
+          });
         } else {
           actualizarBurbuja(
             "No se pudo traducir" +
@@ -627,6 +631,65 @@
     trad.className = "avoc-traduccion";
     trad.textContent = traduccion;
     contenido.appendChild(trad);
+  }
+
+  function marcarCopiado(soloTexto) {
+    if (!burbujaActual) return;
+    const contenido = burbujaActual.querySelector(".avoc-contenido");
+    if (!contenido) return;
+    let aviso = contenido.querySelector(".avoc-copiado");
+    if (!aviso) {
+      aviso = document.createElement("div");
+      aviso.className = "avoc-copiado";
+      contenido.appendChild(aviso);
+    }
+    aviso.textContent = soloTexto
+      ? "✓ Texto copiado al portapapeles"
+      : "✓ Traducción y original copiados";
+  }
+
+  // Copia texto al portapapeles. Intenta la API moderna y, si no hay permiso o
+  // activación del usuario (la copia ocurre tras la traducción), usa execCommand
+  // con un textarea temporal (habilitado por el permiso "clipboardWrite").
+  async function copiarAlPortapapeles(texto) {
+    const valor = String(texto || "");
+    if (!valor) return false;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(valor);
+        return true;
+      } catch (error) {
+        // Sin activación o sin permiso: se usa el método de respaldo.
+      }
+    }
+    return copiarConExecCommand(valor);
+  }
+
+  function copiarConExecCommand(valor) {
+    const area = document.createElement("textarea");
+    area.value = valor;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.top = "-1000px";
+    area.style.left = "0";
+    area.style.opacity = "0";
+    area.style.pointerEvents = "none";
+    (document.body || document.documentElement).appendChild(area);
+
+    let ok = false;
+    try {
+      const activo = document.activeElement;
+      area.select();
+      area.setSelectionRange(0, valor.length);
+      ok = document.execCommand("copy");
+      if (activo && typeof activo.focus === "function") activo.focus();
+    } catch (error) {
+      ok = false;
+    } finally {
+      if (area.parentNode) area.parentNode.removeChild(area);
+    }
+    return ok;
   }
 
   function cerrarBurbuja() {

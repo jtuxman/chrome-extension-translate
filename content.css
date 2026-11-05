@@ -45,6 +45,15 @@
   color: #1f2933;
 }
 
+.avoc-copiado {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #eceff3;
+  color: #12805c;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 /* Recorte con Control: el cursor avisa el modo y el rectángulo marca la zona. */
 html.avoc-modo-recorte,
 html.avoc-modo-recorte * {

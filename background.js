@@ -124,7 +124,36 @@ async function manejarTraduccion(mensaje, sender) {
   const traduccion = await traducir(texto, config);
   await guardarEnVocabulario({ texto, traduccion, contexto, url });
 
-  return { ok: true, traduccion };
+  // Qué copiar al portapapeles: si el texto original ya está en español, solo
+  // el texto; si está en inglés (u otro idioma), la traducción y el original.
+  const idioma = await detectarIdioma(texto);
+  const esEspanol = !!idioma && idioma.toLowerCase().startsWith("es");
+  const textoCopiar = esEspanol ? texto : traduccion + "\n" + texto;
+
+  return { ok: true, traduccion, idioma, esEspanol, textoCopiar };
+}
+
+// Detecta el idioma del texto para decidir qué se copia al portapapeles.
+// Usa señales fuertes del español y, si no, la API chrome.i18n.detectLanguage.
+async function detectarIdioma(texto) {
+  const limpio = String(texto || "").trim();
+  if (!limpio) return null;
+
+  // Signos y letras exclusivos del español: señal muy fiable.
+  if (/[¿¡ñ]/i.test(limpio)) return "es";
+
+  if (chrome.i18n && typeof chrome.i18n.detectLanguage === "function") {
+    try {
+      const resultado = await chrome.i18n.detectLanguage(limpio);
+      const lenguas = (resultado && resultado.languages) || [];
+      if (lenguas.length && lenguas[0] && lenguas[0].language) {
+        return lenguas[0].language;
+      }
+    } catch (error) {
+      // Si la detección falla, se trata como "no español" (caso inglés).
+    }
+  }
+  return null;
 }
 
 // Prueba desde la página de opciones: traduce un texto fijo y NO guarda nada.
