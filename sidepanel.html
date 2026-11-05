@@ -39,7 +39,17 @@
     </p>
 
     <footer class="pie">
-      <p id="driveEstado" class="drive-estado">Sincronizando…</p>
+      <div class="drive">
+        <p id="driveEstado" class="drive-estado">Comprobando Google Drive…</p>
+        <div class="drive-botones">
+          <button id="driveConectar" class="btn-google" type="button" hidden>
+            Continuar con Google
+          </button>
+          <button id="driveDesconectar" class="btn-pie" type="button" hidden>
+            Desconectar
+          </button>
+        </div>
+      </div>
       <div class="pie-fila">
         <button id="exportar" class="btn-pie" type="button">Exportar JSON</button>
         <button id="importar" class="btn-pie" type="button">Importar JSON</button>

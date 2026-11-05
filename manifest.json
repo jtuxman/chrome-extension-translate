@@ -4,14 +4,15 @@
   "description": "Selecciona una palabra o frase en inglés, o recorta texto de la página o de una imagen con Control, tradúcelo al español y repásalo.",
   "version": "0.3.0",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7tiW/h2IUW9+S1wduZaYvgt1NPw5uvQLxPAbeZaP39hRoDVOexvCwMONCiVT/N96brPbw70sj2p242ml64J6o3bPli87x/e9vUbQU+/JcVzUPFURf3F5Y1s7OTBMMJwBcwueWS0xJ+zITwsYWxMSTMnMW/R7WemhaF1Lqt2k+o26vDpz2UAcj/2uUQNwl8NkE41chozfyc1thdjqyd0PHi8ixRCZsBySe4CMpGVCOpby2nMwt9KDxTtsEdL+ieBaeue6jJCpkzWvbqMISEfqs7F3iOWgvKrPrmZ+sogAViWaZZT1zdKVdvBtH+HBw7OZyvLlM76QxHya6/4/11QYBQIDAQAB",
-  "permissions": ["storage", "sidePanel", "activeTab", "offscreen", "identity", "identity.email"],
+  "permissions": ["storage", "sidePanel", "activeTab", "offscreen", "identity"],
   "host_permissions": [
     "<all_urls>",
     "https://api.mymemory.translated.net/*",
     "https://libretranslate.com/*",
     "https://api-free.deepl.com/*",
     "https://api.deepl.com/*",
-    "https://translation.googleapis.com/*"
+    "https://translation.googleapis.com/*",
+    "https://www.googleapis.com/*"
   ],
   "optional_host_permissions": ["https://*/*"],
   "options_page": "options.html",
@@ -44,5 +45,9 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "oauth2": {
+    "client_id": "930686216524-vvg0gnhu3gc1qkvladf0sf4djfpot79m.apps.googleusercontent.com",
+    "scopes": ["https://www.googleapis.com/auth/drive.file"]
   }
 }

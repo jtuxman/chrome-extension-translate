@@ -75,6 +75,20 @@ chrome.runtime.onMessage.addListener((mensaje, sender, sendResponse) => {
     return true;
   }
 
+  if (mensaje && mensaje.tipo === "drive-conectar") {
+    conectarDrive()
+      .then((resultado) => sendResponse(resultado))
+      .catch((error) => responderErrorDrive(error, sendResponse));
+    return true;
+  }
+
+  if (mensaje && mensaje.tipo === "drive-desconectar") {
+    desconectarDrive()
+      .then((resultado) => sendResponse(resultado))
+      .catch((error) => responderErrorDrive(error, sendResponse));
+    return true;
+  }
+
   if (mensaje && mensaje.tipo === "drive-sincronizar") {
     sincronizarDrive()
       .then((resultado) => sendResponse(resultado))

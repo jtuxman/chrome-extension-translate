@@ -203,6 +203,28 @@ body {
   color: #b42318;
 }
 
+.btn-google {
+  flex: 1;
+  border: 1px solid #dadce0;
+  background: #fff;
+  color: #3c4043;
+  border-radius: 20px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.btn-google:hover {
+  background: #f8f9fa;
+  border-color: #c6c9cc;
+}
+
+.btn-google:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .btn-pie {
   flex: 1;
   border: 1px solid #d9dee5;

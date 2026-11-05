@@ -15,6 +15,8 @@ const exportar = document.getElementById("exportar");
 const importar = document.getElementById("importar");
 const archivoImport = document.getElementById("archivoImport");
 const driveEstado = document.getElementById("driveEstado");
+const driveConectar = document.getElementById("driveConectar");
+const driveDesconectar = document.getElementById("driveDesconectar");
 
 let vocabularioActual = {};
 
@@ -201,24 +203,42 @@ function enviarDrive(mensaje) {
   });
 }
 
+driveConectar.addEventListener("click", async () => {
+  driveConectar.disabled = true;
+  driveEstado.classList.remove("error");
+  driveEstado.textContent = "Abriendo Google…";
+  pintarDrive(await enviarDrive({ tipo: "drive-conectar" }));
+  driveConectar.disabled = false;
+});
+
+driveDesconectar.addEventListener("click", async () => {
+  pintarDrive(await enviarDrive({ tipo: "drive-desconectar" }));
+});
+
 async function prepararDrive() {
-  const resultado = await enviarDrive({ tipo: "drive-sincronizar" });
-  pintarDrive(resultado);
+  const estado = await enviarDrive({ tipo: "drive-estado" });
+  pintarDrive(estado);
+  if (estado.conectado) pintarDrive(await enviarDrive({ tipo: "drive-sincronizar" }));
 }
 
 function pintarDrive(estado) {
   estado = estado || {};
+  const conectado = !!estado.conectado;
+  driveConectar.hidden = conectado;
+  driveDesconectar.hidden = !conectado;
+  driveEstado.classList.toggle("error", estado.ok === false);
+
   if (estado.ok === false) {
-    driveEstado.textContent = estado.error || "No se pudo sincronizar";
-    driveEstado.classList.add("error");
-    return;
+    driveEstado.textContent = estado.error || "No se pudo conectar con Google Drive";
+  } else if (conectado) {
+    const cuenta = estado.email ? " de " + estado.email : "";
+    driveEstado.textContent =
+      "Guardado en Google Drive" + cuenta + ": carpeta «" + estado.carpeta + "», archivo " +
+      estado.archivo + ".";
+  } else {
+    driveEstado.textContent =
+      "Guarda tus palabras en Google Drive para verlas desde otra computadora.";
   }
-  driveEstado.classList.remove("error");
-  const cuenta = estado.email ? " (" + estado.email + ")" : "";
-  driveEstado.textContent =
-    "Sincronizado con la cuenta de Google de Chrome" +
-    cuenta +
-    ". En otra computadora, abre Chrome con esa misma cuenta.";
 }
 
 // --- Exportar / Importar ----------------------------------------------------
