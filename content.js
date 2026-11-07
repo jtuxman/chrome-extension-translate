@@ -8,11 +8,18 @@
   let ctrlPulsado = false;
   let suprimirClick = false;
   let gesto = null;
+  const enMarco = window.top !== window;
+  let marcoConBurbuja = null;
+  let deshacerActual = null; // cómo quitar del diccionario la traducción visible
+  let descartarPendiente = 0; // id de la solicitud que se cerró con Escape
+  let ultimaSeleccion = { texto: "", momento: 0 };
 
-  document.addEventListener("mouseup", onSeleccion, true);
-  document.addEventListener("dblclick", onSeleccion, true);
+  // En window y en captura, para adelantarse a reproductores que detienen los
+  // eventos antes de que lleguen a document.
+  window.addEventListener("mouseup", onSeleccion, true);
+  window.addEventListener("dblclick", onSeleccion, true);
 
-  document.addEventListener(
+  window.addEventListener(
     "mousedown",
     (evento) => {
       if (burbujaActual && !burbujaActual.contains(evento.target)) {
@@ -22,19 +29,22 @@
     true
   );
 
-  document.addEventListener("keydown", onTeclaAbajo, true);
-  document.addEventListener("keyup", onTeclaArriba, true);
-  document.addEventListener("pointerdown", onPointerDown, true);
-  document.addEventListener("pointermove", onPointerMove, true);
-  document.addEventListener("pointerup", onPointerUp, true);
-  document.addEventListener("pointercancel", onPointerUp, true);
-  document.addEventListener("dragstart", onDragStart, true);
-  document.addEventListener("click", onClick, true);
+  window.addEventListener("keydown", onTeclaAbajo, true);
+  window.addEventListener("keyup", onTeclaArriba, true);
+  window.addEventListener("pointerdown", onPointerDown, true);
+  window.addEventListener("pointermove", onPointerMove, true);
+  window.addEventListener("pointerup", onPointerUp, true);
+  window.addEventListener("pointercancel", onPointerUp, true);
+  window.addEventListener("dragstart", onDragStart, true);
+  window.addEventListener("click", onClick, true);
   window.addEventListener("blur", cancelarGesto);
+  window.addEventListener("message", onPosicionPedida);
+  window.addEventListener("message", onAvisoBurbuja);
 
   function onSeleccion(evento) {
     if (evento.ctrlKey || gesto) return;
-    if (evento.target.closest && evento.target.closest(".avoc-burbuja, .avoc-capa")) return;
+    if (!evento.target || !evento.target.closest) return;
+    if (evento.target.closest(".avoc-burbuja, .avoc-capa")) return;
     setTimeout(procesarSeleccion, 10);
   }
 
@@ -51,6 +61,14 @@
     const rect = obtenerRect(seleccion);
     if (!rect) return;
 
+    // Un doble clic dispara mouseup y dblclick: la misma palabra no se traduce
+    // (ni se cuenta) dos veces.
+    const ahora = Date.now();
+    if (burbujaActual && texto === ultimaSeleccion.texto && ahora - ultimaSeleccion.momento < 1500) {
+      return;
+    }
+    ultimaSeleccion = { texto, momento: ahora };
+
     const id = ++solicitud;
     pedirTraduccion(rect, texto, id, contexto);
   }
@@ -61,9 +79,85 @@
       cancelarGesto();
       return;
     }
-    if (evento.key !== "Control" || evento.repeat) return;
-    ctrlPulsado = true;
-    actualizarCursor();
+    if (evento.key === "Control") {
+      if (evento.repeat) return;
+      ctrlPulsado = true;
+      actualizarCursor();
+      return;
+    }
+    cerrarConTecla(evento);
+  }
+
+  // Cualquier tecla cierra la traducción, salvo modificadores y atajos con
+  // Control/Cmd (Ctrl+C, recorte). Escape además la quita del diccionario.
+  // Sin un campo de texto enfocado, la tecla no llega a la página: así Espacio
+  // no pausa el video al cerrar.
+  function cerrarConTecla(evento) {
+    if (gesto || evento.ctrlKey || evento.metaKey) return;
+    if (["Shift", "Alt", "AltGraph", "Meta", "CapsLock", "Dead"].includes(evento.key)) return;
+    const descartar = evento.key === "Escape";
+
+    if (!burbujaActual) {
+      if (!enMarco && marcoConBurbuja) {
+        try {
+          marcoConBurbuja.postMessage({ avoc: "cerrar-burbuja", descartar }, "*");
+        } catch (error) {
+          // El marco ya no existe.
+        }
+        marcoConBurbuja = null;
+      }
+      return;
+    }
+
+    cerrarPorTecla(descartar);
+    if (!enEdicion(evento.target)) {
+      evento.preventDefault();
+      evento.stopImmediatePropagation();
+    }
+  }
+
+  function cerrarPorTecla(descartar) {
+    if (descartar) {
+      if (deshacerActual) {
+        chrome.runtime.sendMessage({ tipo: "descartar", deshacer: deshacerActual }, () => {
+          void chrome.runtime.lastError;
+        });
+        deshacerActual = null;
+      } else {
+        // La traducción todavía no llega: se descarta en cuanto se guarde.
+        descartarPendiente = solicitud;
+      }
+    }
+    ++solicitud;
+    cerrarBurbuja();
+  }
+
+  function enEdicion(elemento) {
+    if (!elemento || !elemento.closest) return false;
+    return !!elemento.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']");
+  }
+
+  // La traducción vive en el marco donde se pidió, pero el foco del teclado
+  // puede seguir en la página principal: ésta le reenvía el cierre.
+  function onAvisoBurbuja(evento) {
+    const datos = evento.data;
+    if (!datos || typeof datos.avoc !== "string") return;
+    if (!enMarco && datos.avoc === "burbuja-abierta") {
+      marcoConBurbuja = evento.source;
+    } else if (!enMarco && datos.avoc === "burbuja-cerrada") {
+      if (marcoConBurbuja === evento.source) marcoConBurbuja = null;
+    } else if (enMarco && datos.avoc === "cerrar-burbuja" && evento.source === window.top) {
+      cerrarPorTecla(!!datos.descartar);
+    }
+  }
+
+  function avisarAlPrincipal(tipo) {
+    if (!enMarco) return;
+    try {
+      window.top.postMessage({ avoc: tipo }, "*");
+    } catch (error) {
+      // Sin acceso a la página principal.
+    }
   }
 
   function onTeclaArriba(evento) {
@@ -75,7 +169,9 @@
   function onPointerDown(evento) {
     if (!evento.ctrlKey || evento.button !== 0) return;
     if (evento.pointerType && evento.pointerType !== "mouse") return;
-    if (evento.target.closest && evento.target.closest(".avoc-burbuja")) return;
+    if (evento.target && evento.target.closest && evento.target.closest(".avoc-burbuja")) {
+      return;
+    }
 
     gesto = {
       pointerId: evento.pointerId,
@@ -186,13 +282,91 @@
       const marco = document.createElement("div");
       marco.className = "avoc-rect";
       capa.appendChild(marco);
-      document.documentElement.appendChild(capa);
+      raizCapas().appendChild(capa);
     }
     const marco = capa.querySelector(".avoc-rect");
     marco.style.left = rect.left + "px";
     marco.style.top = rect.top + "px";
     marco.style.width = rect.width + "px";
     marco.style.height = rect.height + "px";
+  }
+
+  // En pantalla completa solo se ve lo que está dentro del elemento ampliado.
+  function raizCapas() {
+    const ampliado = document.fullscreenElement;
+    if (ampliado && ampliado.tagName !== "VIDEO") return ampliado;
+    return document.documentElement;
+  }
+
+  // Posición de este marco dentro de la pestaña: la captura de pantalla es de la
+  // pestaña entera y cada iframe sólo conoce sus propias coordenadas.
+  function posicionEnPestana() {
+    if (!enMarco) {
+      return Promise.resolve({
+        x: 0,
+        y: 0,
+        ancho: window.innerWidth,
+        alto: window.innerHeight,
+      });
+    }
+    return new Promise((resolve) => {
+      const id = "avoc-" + Math.random().toString(36).slice(2);
+      const limite = setTimeout(() => terminar(null), 1500);
+      function oir(evento) {
+        const datos = evento.data;
+        if (evento.source !== window.parent) return;
+        if (!datos || datos.avoc !== "posicion" || datos.id !== id) return;
+        terminar(datos.posicion);
+      }
+      function terminar(posicion) {
+        clearTimeout(limite);
+        window.removeEventListener("message", oir);
+        resolve(posicion);
+      }
+      window.addEventListener("message", oir);
+      window.parent.postMessage({ avoc: "posicion?", id }, "*");
+    });
+  }
+
+  async function onPosicionPedida(evento) {
+    const datos = evento.data;
+    if (!datos || datos.avoc !== "posicion?" || !evento.source) return;
+    const iframe = buscarIframe(evento.source);
+    if (!iframe) return;
+
+    const caja = iframe.getBoundingClientRect();
+    const estilo = getComputedStyle(iframe);
+    const dx = caja.left + iframe.clientLeft + (parseFloat(estilo.paddingLeft) || 0);
+    const dy = caja.top + iframe.clientTop + (parseFloat(estilo.paddingTop) || 0);
+    const propia = await posicionEnPestana();
+    if (!propia) return;
+    evento.source.postMessage(
+      {
+        avoc: "posicion",
+        id: datos.id,
+        posicion: {
+          x: propia.x + dx,
+          y: propia.y + dy,
+          ancho: propia.ancho,
+          alto: propia.alto,
+        },
+      },
+      "*"
+    );
+  }
+
+  function buscarIframe(ventana) {
+    let encontrado = null;
+    porCadaRaiz(document, (raiz) => {
+      if (encontrado || !raiz.querySelectorAll) return;
+      for (const iframe of raiz.querySelectorAll("iframe, frame")) {
+        if (iframe.contentWindow === ventana) {
+          encontrado = iframe;
+          return;
+        }
+      }
+    });
+    return encontrado;
   }
 
   function quitarCapa() {
@@ -243,21 +417,30 @@
     }
 
     mostrarBurbuja(rect, "Leyendo el recuadro…");
+    const posicion = await posicionEnPestana();
     await esperarPintado();
     if (id !== solicitud) return;
+    if (!posicion) {
+      if (textoDom) {
+        pedirTraduccion(rect, textoDom, id);
+        return;
+      }
+      actualizarBurbuja("No se pudo ubicar este recuadro en la pantalla");
+      return;
+    }
 
     chrome.runtime.sendMessage(
       {
         tipo: "reconocer",
         rect: {
-          x: rect.left,
-          y: rect.top,
+          x: rect.left + posicion.x,
+          y: rect.top + posicion.y,
           width: rect.width,
           height: rect.height,
         },
         viewport: {
-          width: window.innerWidth,
-          height: window.innerHeight,
+          width: posicion.ancho,
+          height: posicion.alto,
         },
       },
       (respuesta) => {
@@ -304,13 +487,22 @@
         url: location.href,
       },
       (respuesta) => {
+        const error = chrome.runtime.lastError;
+        if (!error && respuesta && respuesta.ok && respuesta.deshacer && descartarPendiente === id) {
+          descartarPendiente = 0;
+          chrome.runtime.sendMessage({ tipo: "descartar", deshacer: respuesta.deshacer }, () => {
+            void chrome.runtime.lastError;
+          });
+          return;
+        }
         if (id !== solicitud) return;
-        if (chrome.runtime.lastError) {
-          actualizarBurbuja("Error: " + chrome.runtime.lastError.message, texto);
+        if (error) {
+          actualizarBurbuja("Error: " + error.message, texto);
           return;
         }
         if (respuesta && respuesta.ok) {
-          actualizarBurbuja(respuesta.traduccion, texto);
+          deshacerActual = respuesta.deshacer || null;
+          actualizarBurbuja(respuesta.traduccion, texto, respuesta.detalle, respuesta.detallePendiente);
           const aCopiar = respuesta.textoCopiar || respuesta.traduccion;
           copiarAlPortapapeles(aCopiar).then((copiado) => {
             if (copiado && id === solicitud) marcarCopiado(respuesta.esEspanol);
@@ -604,21 +796,29 @@
 
     burbuja.appendChild(cerrar);
     burbuja.appendChild(contenido);
-    (document.body || document.documentElement).appendChild(burbuja);
 
-    const top = window.scrollY + rect.bottom + 8;
-    const left = Math.max(8, window.scrollX + rect.left);
-    burbuja.style.top = top + "px";
-    burbuja.style.left = left + "px";
+    const raiz = raizCapas();
+    if (raiz !== document.documentElement) {
+      burbuja.style.position = "fixed";
+      burbuja.style.top = Math.min(rect.bottom + 8, window.innerHeight - 80) + "px";
+      burbuja.style.left = Math.max(8, rect.left) + "px";
+      raiz.appendChild(burbuja);
+    } else {
+      (document.body || document.documentElement).appendChild(burbuja);
+      burbuja.style.top = window.scrollY + rect.bottom + 8 + "px";
+      burbuja.style.left = Math.max(8, window.scrollX + rect.left) + "px";
+    }
 
     burbujaActual = burbuja;
+    avisarAlPrincipal("burbuja-abierta");
   }
 
-  function actualizarBurbuja(traduccion, palabra) {
+  function actualizarBurbuja(traduccion, palabra, detalle, pendiente) {
     if (!burbujaActual) return;
     const contenido = burbujaActual.querySelector(".avoc-contenido");
     if (!contenido) return;
     contenido.textContent = "";
+    burbujaActual.dataset.palabra = palabra || "";
 
     if (palabra) {
       const original = document.createElement("div");
@@ -631,7 +831,128 @@
     trad.className = "avoc-traduccion";
     trad.textContent = traduccion;
     contenido.appendChild(trad);
+    pintarDetalle(detalle, pendiente);
+    pintarEnlaces(palabra);
   }
+
+  function terminoBusqueda(palabra) {
+    return String(palabra || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^(to|a|an|the)\s+/i, "");
+  }
+
+  function enlacesEjemplo(palabra) {
+    const termino = terminoBusqueda(palabra);
+    if (!termino) return [];
+    const consulta = encodeURIComponent(termino);
+    return [
+      ["Tatoeba", "https://tatoeba.org/es/sentences/search?from=eng&to=spa&query=" + consulta],
+      ["Reverso", "https://context.reverso.net/traduccion/ingles-espanol/" + consulta],
+      ["Linguee", "https://www.linguee.es/ingles-espanol/search?query=" + consulta],
+    ];
+  }
+
+  function pintarEnlaces(palabra) {
+    if (!burbujaActual) return;
+    const contenido = burbujaActual.querySelector(".avoc-contenido");
+    if (!contenido) return;
+    const previo = contenido.querySelector(".avoc-mas");
+    if (previo) previo.remove();
+    const ligas = enlacesEjemplo(palabra);
+    if (!ligas.length) return;
+
+    const fila = document.createElement("div");
+    fila.className = "avoc-mas";
+    for (const [nombre, href] of ligas) {
+      const liga = document.createElement("a");
+      liga.href = href;
+      liga.target = "_blank";
+      liga.rel = "noreferrer";
+      liga.textContent = nombre;
+      fila.appendChild(liga);
+    }
+    const aviso = contenido.querySelector(".avoc-copiado");
+    contenido.insertBefore(fila, aviso);
+  }
+
+  function expresionCorta(texto) {
+    const limpio = String(texto || "").trim();
+    return limpio.length > 0 && limpio.length <= 40 && limpio.split(/\s+/).length <= 4 && !/[.!?]/.test(limpio);
+  }
+
+  function pintarDetalle(detalle, pendiente) {
+    if (!burbujaActual) return;
+    const contenido = burbujaActual.querySelector(".avoc-contenido");
+    if (!contenido) return;
+    const previo = contenido.querySelector(".avoc-detalle");
+    if (previo) previo.remove();
+
+    const acepciones = (detalle && detalle.acepciones) || [];
+    const ejemplos = (detalle && detalle.ejemplos) || [];
+    const corta = expresionCorta(burbujaActual.dataset.palabra || "");
+    const respondida = pendiente === true || pendiente === false;
+    if (!acepciones.length && !ejemplos.length && !respondida) return;
+    if (!acepciones.length && !ejemplos.length && !pendiente && !corta) return;
+
+    const bloque = document.createElement("div");
+    bloque.className = "avoc-detalle";
+
+    if (!acepciones.length && !ejemplos.length) {
+      const espera = document.createElement("p");
+      espera.className = "avoc-espera";
+      espera.textContent = pendiente
+        ? "Buscando acepciones y frases…"
+        : "No hay frases de ejemplo para esta expresión.";
+      bloque.appendChild(espera);
+    }
+
+    if (acepciones.length) {
+      const titulo = document.createElement("p");
+      titulo.className = "avoc-detalle-titulo";
+      titulo.textContent = "Otras acepciones";
+      bloque.appendChild(titulo);
+      for (const acepcion of acepciones) {
+        const linea = document.createElement("p");
+        linea.className = "avoc-acepcion";
+        linea.textContent = (acepcion.tipo ? acepcion.tipo + ": " : "") + acepcion.es;
+        bloque.appendChild(linea);
+      }
+    }
+
+    if (ejemplos.length) {
+      const lista = document.createElement("details");
+      lista.className = "avoc-frases";
+      const resumen = document.createElement("summary");
+      resumen.textContent = ejemplos.length + (ejemplos.length === 1 ? " frase de ejemplo" : " frases de ejemplo");
+      lista.appendChild(resumen);
+      for (const ejemplo of ejemplos) {
+        const frase = document.createElement("p");
+        frase.className = "avoc-frase";
+        const en = document.createElement("span");
+        en.className = "avoc-frase-en";
+        en.textContent = ejemplo.en;
+        const es = document.createElement("span");
+        es.textContent = ejemplo.es;
+        frase.appendChild(en);
+        frase.appendChild(es);
+        lista.appendChild(frase);
+      }
+      bloque.appendChild(lista);
+    }
+
+    const aviso = contenido.querySelector(".avoc-copiado");
+    const mas = contenido.querySelector(".avoc-mas");
+    contenido.insertBefore(bloque, mas || aviso);
+  }
+
+  chrome.storage.onChanged.addListener((cambios, area) => {
+    if (area !== "local" || !cambios.vocabulario || !burbujaActual) return;
+    const clave = (burbujaActual.dataset.palabra || "").toLowerCase();
+    const item = ((cambios.vocabulario.newValue || {})[clave]);
+    if (!item) return;
+    pintarDetalle({ acepciones: item.acepciones || [], ejemplos: item.ejemplos || [] }, false);
+  });
 
   function marcarCopiado(soloTexto) {
     if (!burbujaActual) return;
@@ -693,9 +1014,12 @@
   }
 
   function cerrarBurbuja() {
+    const habia = !!burbujaActual;
+    deshacerActual = null;
     if (burbujaActual && burbujaActual.parentNode) {
       burbujaActual.parentNode.removeChild(burbujaActual);
     }
     burbujaActual = null;
+    if (habia) avisarAlPrincipal("burbuja-cerrada");
   }
 })();

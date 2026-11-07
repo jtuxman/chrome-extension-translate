@@ -27,7 +27,7 @@ Pestaña con texto
 - `content.js` / `content.css` — captura la selección y muestra la burbuja.
 - `sidepanel.html` / `sidepanel.js` / `sidepanel.css` — panel lateral de repaso (con Jugar, Ajustes, exportar/importar).
 - `options.html` / `options.js` / `options.css` — página de ajustes (motor de traducción y API keys).
-- `juego.html` / `juego.js` / `juego.css` — juegos de vocabulario (flashcards, opción múltiple, escribir).
+- `juego.html` / `juego.js` / `juego.css` — juegos de vocabulario (reto, opción múltiple, escribir).
 - `icons/` — iconos placeholder (16/48/128).
 
 ## Instalar en Chrome (modo desarrollador)
@@ -43,6 +43,9 @@ Pestaña con texto
 1. Abre cualquier artículo en inglés.
 2. Selecciona una palabra (p. ej. `overwhelming`) o una frase corta.
 3. Aparecerá una burbuja con la traducción y se guardará en el panel lateral.
+   Para una palabra corta, enseguida se agregan 2 o 3 acepciones y hasta 10
+   frases de ejemplo con su traducción (Gemini si pegas una clave en Ajustes;
+   si no, un diccionario y frases reales de Tatoeba).
 4. Abre el panel (icono de la extensión) para repasar tu vocabulario; se
    actualiza automáticamente cada vez que guardas una palabra nueva.
 
@@ -51,10 +54,20 @@ Pestaña con texto
 Desde el panel lateral, el botón **Jugar** abre `juego.html` (en una pestaña
 nueva). Los juegos usan las palabras que ya tienes guardadas:
 
-- **Flashcards:** ves la palabra y revelas la traducción.
+- **Reto:** 10 opciones parecidas entre sí y una barra de tiempo (teclas
+  1–9 y 0). La velocidad, también en los otros juegos, se elige en Lento (25 s),
+  Normal (15 s) o Rápido (8 s). Al empezar queda en Lento.
+  La opción correcta es siempre la traducción que guardaste.
 - **Opción múltiple:** eliges la traducción correcta entre varias (los
   distractores salen de tu propio vocabulario).
-- **Escribir:** escribes la traducción (se ignoran mayúsculas y acentos).
+- **Escribir:** solo palabras sueltas, sin frases. Antes de escribir ves una
+  casilla por letra con la primera ya puesta; al comprobar, la corrección queda
+  en pantalla hasta pulsar Siguiente (se ignoran mayúsculas y acentos).
+
+Cada palabra guarda la fecha en que la agregaste (se ve en el panel). En
+**Palabras guardadas** eliges qué repasar en cualquiera de los juegos: las de
+hoy, las de los últimos 7 días, las de los últimos 30 días o todas. La misma
+lista está en la barra de cada juego para cambiar de periodo sin salir.
 
 Puedes elegir la **dirección**: Inglés → Español (por defecto) o el modo
 inverso Español → Inglés. También hay una **racha diaria** (🔥): cuenta los días

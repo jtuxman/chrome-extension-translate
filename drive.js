@@ -174,13 +174,31 @@ function fusionarVocabulario(localVocab, localElim, remoto) {
     if (tumba) delete eliminadas[clave];
 
     if (local && remotoItem) {
-      vocabulario[clave] = fechaItem(remotoItem) > fechaItem(local) ? remotoItem : local;
+      const ganaRemoto = fechaItem(remotoItem) > fechaItem(local);
+      vocabulario[clave] = completarDetalle(
+        ganaRemoto ? remotoItem : local,
+        ganaRemoto ? local : remotoItem
+      );
     } else if (remotoItem) {
       vocabulario[clave] = remotoItem;
     }
   }
 
   return { vocabulario, eliminadas };
+}
+
+// La ficha más reciente manda, pero no se pierden las acepciones ni las frases
+// si solo las tiene la otra copia.
+function completarDetalle(ganador, otro) {
+  const resultado = { ...ganador };
+  if ((otro.acepciones || []).length > (resultado.acepciones || []).length) {
+    resultado.acepciones = otro.acepciones;
+  }
+  if ((otro.ejemplos || []).length > (resultado.ejemplos || []).length) {
+    resultado.ejemplos = otro.ejemplos;
+    if (otro.detalleFuente) resultado.detalleFuente = otro.detalleFuente;
+  }
+  return resultado;
 }
 
 function masReciente(a, b) {

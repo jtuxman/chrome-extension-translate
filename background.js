@@ -1,4 +1,4 @@
-importScripts("drive.js");
+importScripts("drive.js", "enriquecer.js");
 
 // Service worker: coordina la traducción (según el motor configurado) y
 // persiste el vocabulario.
@@ -12,6 +12,7 @@ const CONFIG_POR_DEFECTO = {
   libre: { url: "https://libretranslate.com/translate", apiKey: "" },
   deepl: { apiKey: "", plan: "free" },
   google: { apiKey: "" },
+  gemini: { apiKey: "" },
 };
 
 // Canal con el documento offscreen que ejecuta el OCR.
@@ -61,6 +62,13 @@ chrome.runtime.onMessage.addListener((mensaje, sender, sendResponse) => {
     return true; // respuesta asíncrona
   }
 
+  if (mensaje && mensaje.tipo === "descartar") {
+    descartarDelVocabulario(mensaje.deshacer)
+      .then((resultado) => sendResponse(resultado))
+      .catch((error) => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+
   if (mensaje && mensaje.tipo === "probar") {
     manejarPrueba(mensaje)
       .then((resultado) => sendResponse(resultado))
@@ -96,6 +104,20 @@ chrome.runtime.onMessage.addListener((mensaje, sender, sendResponse) => {
     return true;
   }
 
+  if (mensaje && mensaje.tipo === "detalle-reponer") {
+    reponerColaDetalle()
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+
+  if (mensaje && mensaje.tipo === "detalle-reintentar") {
+    reintentarDetalle(mensaje.clave)
+      .then((resultado) => sendResponse(resultado))
+      .catch((error) => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+
   if (mensaje && mensaje.tipo === "reconocer") {
     manejarReconocimiento(mensaje, sender)
       .then((resultado) => sendResponse(resultado))
@@ -121,8 +143,8 @@ async function manejarTraduccion(mensaje, sender) {
   }
 
   const config = await obtenerConfig();
-  const traduccion = await traducir(texto, config);
-  await guardarEnVocabulario({ texto, traduccion, contexto, url });
+  const traduccion = (await traducir(texto, config)).replace(/\s+[-–—]+\s*$/, "");
+  const deshacer = await guardarEnVocabulario({ texto, traduccion, contexto, url });
 
   // Qué copiar al portapapeles: si el texto original ya está en español, solo
   // el texto; si está en inglés (u otro idioma), la traducción y el original.
@@ -130,7 +152,20 @@ async function manejarTraduccion(mensaje, sender) {
   const esEspanol = !!idioma && idioma.toLowerCase().startsWith("es");
   const textoCopiar = esEspanol ? texto : traduccion + "\n" + texto;
 
-  return { ok: true, traduccion, idioma, esEspanol, textoCopiar };
+  const ficha = await fichaDe(texto);
+  const detalle = {
+    acepciones: (ficha && ficha.acepciones) || [],
+    ejemplos: (ficha && ficha.ejemplos) || [],
+  };
+  const detallePendiente = !esEspanol && sirveParaDetalle(texto) && necesitaDetalle(ficha || { palabra: texto });
+  if (detallePendiente) programarEnriquecimiento(texto.toLowerCase());
+
+  return { ok: true, traduccion, idioma, esEspanol, textoCopiar, deshacer, detalle, detallePendiente };
+}
+
+async function fichaDe(texto) {
+  const almacen = await chrome.storage.local.get(STORAGE_KEY);
+  return (almacen[STORAGE_KEY] || {})[texto.toLowerCase()] || null;
 }
 
 // Detecta el idioma del texto para decidir qué se copia al portapapeles.
@@ -180,13 +215,64 @@ function fusionarConfig(base, extra) {
     libre: { ...base.libre, ...(extra.libre || {}) },
     deepl: { ...base.deepl, ...(extra.deepl || {}) },
     google: { ...base.google, ...(extra.google || {}) },
+    gemini: { ...base.gemini, ...(extra.gemini || {}) },
   };
 }
 
 // --- Despachador de motores -------------------------------------------------
 
+// Se consultan a la vez los motores disponibles. Si el elegido tarda o falla,
+// responde el primero de los demás que entregue una traducción real.
+const TIEMPO_MOTOR_MS = 8000;
+const ESPERA_PREFERIDO_MS = 700;
+
 async function traducir(texto, config) {
-  switch (config.motor) {
+  const preferido = config.motor || "mymemory";
+  const motores = ["mymemory"];
+  if (config.libre && config.libre.url) motores.push("libretranslate");
+  if (config.deepl && config.deepl.apiKey) motores.push("deepl");
+  if (config.google && config.google.apiKey) motores.push("google");
+
+  const tareas = motores.map((motor) => ({
+    motor,
+    promesa: conTiempo(traducirMotor(motor, texto, config), TIEMPO_MOTOR_MS),
+  }));
+  // Chrome se suma a la carrera sin retrasar a los demás: primero se comprueba
+  // si el modelo ya está descargado.
+  tareas.push({
+    motor: "chrome",
+    promesa: conTiempo(
+      chromePuedeTraducir(config).then((puede) => {
+        if (!puede) throw new Error("Chrome no está listo para traducir");
+        return traducirChrome(texto, config);
+      }),
+      TIEMPO_MOTOR_MS
+    ),
+  });
+  return primeraRespuesta(tareas, texto, preferido);
+}
+
+async function chromePuedeTraducir(config) {
+  const TranslatorAPI =
+    (typeof self !== "undefined" && self.Translator) ||
+    (typeof Translator !== "undefined" ? Translator : null);
+  if (!TranslatorAPI || typeof TranslatorAPI.availability !== "function") return false;
+  try {
+    const estado = await conTiempo(
+      TranslatorAPI.availability({
+        sourceLanguage: config.sourceLang,
+        targetLanguage: config.targetLang,
+      }),
+      1500
+    );
+    return estado === "available";
+  } catch (error) {
+    return false;
+  }
+}
+
+function traducirMotor(motor, texto, config) {
+  switch (motor) {
     case "libretranslate":
       return traducirLibre(texto, config);
     case "chrome":
@@ -199,6 +285,97 @@ async function traducir(texto, config) {
     default:
       return traducirMyMemory(texto, config);
   }
+}
+
+function conTiempo(promesa, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Tardó demasiado")), ms);
+    Promise.resolve(promesa).then(
+      (valor) => {
+        clearTimeout(timer);
+        resolve(valor);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
+// Aviso de cupo agotado o el texto original devuelto sin traducir.
+function esTraduccionUtil(origen, traduccion) {
+  const texto = String(traduccion || "").trim();
+  if (!texto) return false;
+  if (/MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID LANGUAGE PAIR|EXAMPLE REQUEST/i.test(texto)) {
+    return false;
+  }
+  return texto.toLowerCase() !== String(origen || "").trim().toLowerCase();
+}
+
+function primeraRespuesta(tareas, origen, preferido) {
+  return new Promise((resolve, reject) => {
+    let pendientes = tareas.length;
+    let resuelto = false;
+    let respaldo = "";
+    let espera = null;
+    const errores = [];
+    const copias = [];
+
+    if (!pendientes) {
+      reject(new Error("No hay motores de traducción disponibles"));
+      return;
+    }
+
+    function usar(texto) {
+      if (resuelto) return;
+      resuelto = true;
+      clearTimeout(espera);
+      resolve(texto);
+    }
+
+    function cerrar() {
+      if (resuelto) return;
+      if (respaldo) {
+        usar(respaldo);
+        return;
+      }
+      // Palabra igual en los dos idiomas ("hotel"): se acepta la copia.
+      if (copias.length) {
+        usar(copias[0]);
+        return;
+      }
+      reject(errores[0] || new Error("No se pudo traducir"));
+    }
+
+    for (const tarea of tareas) {
+      Promise.resolve(tarea.promesa)
+        .then((traduccion) => {
+          const limpia = String(traduccion || "").trim();
+          if (esTraduccionUtil(origen, limpia)) {
+            if (tarea.motor === preferido) {
+              usar(limpia);
+              return;
+            }
+            if (!respaldo) {
+              respaldo = limpia;
+              espera = setTimeout(() => usar(respaldo), ESPERA_PREFERIDO_MS);
+            }
+            return;
+          }
+          if (limpia && !/MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID LANGUAGE PAIR/i.test(limpia)) {
+            copias.push(limpia);
+          } else if (limpia) {
+            errores.push(new Error(limpia.slice(0, 180)));
+          }
+        })
+        .catch((error) => errores.push(error))
+        .finally(() => {
+          pendientes--;
+          if (pendientes === 0) cerrar();
+        });
+    }
+  });
 }
 
 async function traducirMyMemory(texto, config) {
@@ -339,6 +516,7 @@ async function guardarEnVocabulario({ texto, traduccion, contexto, url }) {
   const vocabulario = almacen[STORAGE_KEY] || {};
 
   const existente = vocabulario[clave];
+  const deshacer = { clave, nueva: !existente };
   if (existente) {
     existente.vecesVista = (existente.vecesVista || 1) + 1;
     existente.ultimaVez = new Date().toISOString();
@@ -357,6 +535,28 @@ async function guardarEnVocabulario({ texto, traduccion, contexto, url }) {
   }
 
   await chrome.storage.local.set({ [STORAGE_KEY]: vocabulario });
+  return deshacer;
+}
+
+// Escape sobre la traducción: la palabra no cuenta. Si era nueva se borra con
+// marca de borrado (para que Drive no la devuelva); si ya existía, sólo se
+// resta la vez que se acaba de sumar.
+async function descartarDelVocabulario(deshacer) {
+  if (!deshacer || !deshacer.clave) return { ok: false };
+  const almacen = await chrome.storage.local.get([STORAGE_KEY, "eliminadas"]);
+  const vocabulario = almacen[STORAGE_KEY] || {};
+  const eliminadas = almacen.eliminadas || {};
+  const item = vocabulario[deshacer.clave];
+  if (!item) return { ok: true };
+
+  if (deshacer.nueva) {
+    delete vocabulario[deshacer.clave];
+    eliminadas[deshacer.clave] = new Date().toISOString();
+  } else {
+    item.vecesVista = Math.max(1, (item.vecesVista || 1) - 1);
+  }
+  await chrome.storage.local.set({ [STORAGE_KEY]: vocabulario, eliminadas });
+  return { ok: true };
 }
 
 // --- Texto dentro de un recorte de pantalla --------------------------------

@@ -7,6 +7,7 @@ const CONFIG_POR_DEFECTO = {
   libre: { url: "https://libretranslate.com/translate", apiKey: "" },
   deepl: { apiKey: "", plan: "free" },
   google: { apiKey: "" },
+  gemini: { apiKey: "" },
 };
 
 const el = {
@@ -18,6 +19,7 @@ const el = {
   deeplApiKey: document.getElementById("deeplApiKey"),
   deeplPlan: document.getElementById("deeplPlan"),
   googleApiKey: document.getElementById("googleApiKey"),
+  geminiApiKey: document.getElementById("geminiApiKey"),
   guardar: document.getElementById("guardar"),
   probar: document.getElementById("probar"),
   estado: document.getElementById("estado"),
@@ -47,6 +49,7 @@ function fusionar(base, extra) {
     libre: { ...base.libre, ...(extra.libre || {}) },
     deepl: { ...base.deepl, ...(extra.deepl || {}) },
     google: { ...base.google, ...(extra.google || {}) },
+    gemini: { ...base.gemini, ...(extra.gemini || {}) },
   };
 }
 
@@ -63,6 +66,7 @@ function rellenarFormulario(config) {
   el.deeplApiKey.value = config.deepl.apiKey;
   el.deeplPlan.value = config.deepl.plan;
   el.googleApiKey.value = config.google.apiKey;
+  el.geminiApiKey.value = (config.gemini && config.gemini.apiKey) || "";
 }
 
 function motorSeleccionado() {
@@ -92,6 +96,9 @@ function leerFormulario() {
     },
     google: {
       apiKey: el.googleApiKey.value.trim(),
+    },
+    gemini: {
+      apiKey: el.geminiApiKey.value.trim(),
     },
   };
 }

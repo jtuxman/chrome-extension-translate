@@ -1,7 +1,7 @@
 .avoc-burbuja {
   position: absolute;
   z-index: 2147483647;
-  max-width: 320px;
+  max-width: 380px;
   background: #ffffff;
   color: #1f2933;
   border: 1px solid #d9dee5;
@@ -43,6 +43,66 @@
 
 .avoc-traduccion {
   color: #1f2933;
+}
+
+.avoc-detalle {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eceff3;
+}
+
+.avoc-espera,
+.avoc-detalle-titulo {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #667085;
+}
+
+.avoc-acepcion,
+.avoc-frase {
+  margin: 0 0 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.avoc-frases {
+  margin-top: 4px;
+}
+
+.avoc-frases summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6941c6;
+}
+
+.avoc-frases[open] {
+  max-height: 220px;
+  overflow: auto;
+}
+
+.avoc-frase-en {
+  display: block;
+  font-weight: 600;
+}
+
+.avoc-mas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.avoc-mas a {
+  color: #6941c6;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.avoc-mas a:hover {
+  text-decoration: underline;
 }
 
 .avoc-copiado {

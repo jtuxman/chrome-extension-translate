@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Aprende Vocabulario - Traductor EN/ES",
   "description": "Selecciona una palabra o frase en inglés, o recorta texto de la página o de una imagen con Control, tradúcelo al español y repásalo.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7tiW/h2IUW9+S1wduZaYvgt1NPw5uvQLxPAbeZaP39hRoDVOexvCwMONCiVT/N96brPbw70sj2p242ml64J6o3bPli87x/e9vUbQU+/JcVzUPFURf3F5Y1s7OTBMMJwBcwueWS0xJ+zITwsYWxMSTMnMW/R7WemhaF1Lqt2k+o26vDpz2UAcj/2uUQNwl8NkE41chozfyc1thdjqyd0PHi8ixRCZsBySe4CMpGVCOpby2nMwt9KDxTtsEdL+ieBaeue6jJCpkzWvbqMISEfqs7F3iOWgvKrPrmZ+sogAViWaZZT1zdKVdvBtH+HBw7OZyvLlM76QxHya6/4/11QYBQIDAQAB",
   "permissions": ["storage", "sidePanel", "activeTab", "offscreen", "identity", "clipboardWrite"],
   "host_permissions": [
@@ -24,7 +24,9 @@
       "matches": ["<all_urls>"],
       "js": ["content.js"],
       "css": ["content.css"],
-      "run_at": "document_idle"
+      "all_frames": true,
+      "match_origin_as_fallback": true,
+      "run_at": "document_start"
     }
   ],
   "side_panel": {

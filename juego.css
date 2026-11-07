@@ -112,6 +112,21 @@ body {
   color: #344054;
 }
 
+.periodo {
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  color: #344054;
+  font-size: 14px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.barra .periodo {
+  font-size: 13px;
+  padding: 4px 6px;
+}
+
 .direccion label {
   display: inline-flex;
   align-items: center;
@@ -227,40 +242,97 @@ body {
   font-size: 14px;
 }
 
-.respuesta-oculta {
-  font-size: 22px;
-  color: #1f2933;
+.consigna {
+  margin: 0;
+  color: #667085;
+  font-size: 14px;
 }
 
-.juicio {
-  display: flex;
-  gap: 12px;
+/* Reto */
+.tiempo {
+  width: 100%;
+  max-width: 520px;
+  height: 6px;
+  background: #eaecf0;
+  border-radius: 999px;
+  overflow: hidden;
 }
 
-.btn-ok,
-.btn-mal {
-  border: none;
-  border-radius: 10px;
-  padding: 10px 18px;
-  font-size: 15px;
-  cursor: pointer;
-  color: #fff;
-}
-
-.btn-ok {
+.tiempo > div {
+  height: 100%;
+  width: 100%;
   background: #12b76a;
 }
 
-.btn-ok:hover {
-  background: #039855;
-}
-
-.btn-mal {
+.tiempo.urgente > div {
   background: #f04438;
 }
 
-.btn-mal:hover {
-  background: #d92d20;
+.opciones.opciones-reto {
+  max-width: 520px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.opciones-reto .opcion-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 10px 12px;
+}
+
+.tecla {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: #f2f4f7;
+  color: #667085;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Escribir: pista de letras */
+.pista {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.casilla {
+  width: 30px;
+  height: 36px;
+  border-bottom: 3px solid #d0d5dd;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1f2933;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: lowercase;
+}
+
+.casilla.espacio {
+  border-bottom: none;
+  width: 14px;
+}
+
+.casilla.dada {
+  color: #98a2b3;
+}
+
+.casilla.bien {
+  color: #027a48;
+  border-color: #12b76a;
+}
+
+.casilla.mal {
+  color: #b42318;
+  border-color: #f04438;
 }
 
 /* Opción múltiple */

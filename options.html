@@ -10,8 +10,9 @@
     <main class="contenedor">
       <h1>Ajustes</h1>
       <p class="intro">
-        Elige el motor de traducción. Puedes cambiarlo cuando quieras; el resto
-        de la extensión funciona igual.
+        Elige el motor de traducción. Si ese tarda o no responde, la extensión
+        consulta al mismo tiempo los otros que pueda usar (LibreTranslate, Chrome
+        y los que tengan clave) y muestra la primera traducción válida.
       </p>
 
       <section class="tarjeta">
@@ -21,7 +22,7 @@
             <input type="radio" name="motor" value="mymemory" />
             <span class="motor-info">
               <strong>MyMemory</strong>
-              <small>Gratis, sin API key. Ideal para empezar.</small>
+              <small>Gratis, sin API key. Si tarda o falla, se pregunta a la vez a los demás motores disponibles.</small>
             </span>
           </label>
           <label class="motor">
@@ -124,6 +125,21 @@
           necesita una versión reciente de Chrome y puede descargar el modelo de
           idioma la primera vez. Usa "Probar" para comprobar si está disponible.
         </p>
+      </section>
+
+      <section class="tarjeta">
+        <h2>Acepciones y frases</h2>
+        <p class="ayuda">
+          Para cada palabra corta se buscan 2 o 3 acepciones y hasta 10 frases
+          con su traducción. Aparecen en la ventanita y en el panel. Sin esta
+          clave se usan un diccionario y frases reales de Tatoeba; con ella, Gemini
+          redacta mejores ejemplos. Créala gratis con tu cuenta personal en
+          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">Google AI Studio</a>.
+        </p>
+        <label class="campo">
+          Clave de Gemini (opcional)
+          <input id="geminiApiKey" type="password" placeholder="AIza..." autocomplete="off" />
+        </label>
       </section>
 
       <div class="acciones">
