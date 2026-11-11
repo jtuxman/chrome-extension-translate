@@ -45,6 +45,33 @@ body {
   padding: 2px 8px;
 }
 
+.btn-activar {
+  border: 1px solid #abefc6;
+  background: #ecfdf3;
+  color: #067647;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.btn-activar:hover {
+  background: #d1fadf;
+  border-color: #75e0a7;
+}
+
+.btn-activar.inactiva {
+  background: #fef3f2;
+  border-color: #fda29b;
+  color: #b42318;
+}
+
+.btn-activar.inactiva:hover {
+  background: #fee4e2;
+}
+
 .btn-jugar {
   border: none;
   background: #6941c6;

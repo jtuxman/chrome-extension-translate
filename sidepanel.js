@@ -2,8 +2,10 @@
 // chrome.storage cambia.
 
 const STORAGE_KEY = "vocabulario";
+const ACTIVA_KEY = "avocActiva";
 
 const lista = document.getElementById("lista");
+const activar = document.getElementById("activar");
 const vacio = document.getElementById("vacio");
 const contador = document.getElementById("contador");
 const buscar = document.getElementById("buscar");
@@ -22,10 +24,33 @@ let vocabularioActual = {};
 
 document.addEventListener("DOMContentLoaded", () => {
   cargar();
+  cargarActiva();
   prepararDrive();
 });
 
 buscar.addEventListener("input", render);
+
+// Interruptor para pausar la traducción al seleccionar mientras trabajas
+// en otra cosa. El estado se guarda y lo lee el content script.
+activar.addEventListener("click", async () => {
+  const { [ACTIVA_KEY]: valor } = await chrome.storage.local.get(ACTIVA_KEY);
+  const nueva = valor === false; // si estaba desactivada, se activa
+  await chrome.storage.local.set({ [ACTIVA_KEY]: nueva });
+  pintarActiva(nueva);
+});
+
+async function cargarActiva() {
+  const { [ACTIVA_KEY]: valor } = await chrome.storage.local.get(ACTIVA_KEY);
+  pintarActiva(valor !== false);
+}
+
+function pintarActiva(activa) {
+  activar.textContent = activa ? "ACTIVA" : "INACTIVA";
+  activar.classList.toggle("inactiva", !activa);
+  activar.title = activa
+    ? "Traducción activada. Pulsa para desactivarla mientras trabajas en otra cosa."
+    : "Traducción desactivada. Pulsa para volver a activarla.";
+}
 
 ajustes.addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
@@ -59,6 +84,9 @@ chrome.storage.onChanged.addListener((cambios, area) => {
   }
   if (cambios.racha) {
     mostrarRacha();
+  }
+  if (cambios[ACTIVA_KEY]) {
+    pintarActiva(cambios[ACTIVA_KEY].newValue !== false);
   }
 });
 

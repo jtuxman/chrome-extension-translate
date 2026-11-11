@@ -13,6 +13,7 @@
   let deshacerActual = null; // cómo quitar del diccionario la traducción visible
   let descartarPendiente = 0; // id de la solicitud que se cerró con Escape
   let ultimaSeleccion = { texto: "", momento: 0 };
+  let activa = true; // interruptor controlado desde el panel lateral
 
   // En window y en captura, para adelantarse a reproductores que detienen los
   // eventos antes de que lleguen a document.
@@ -41,7 +42,26 @@
   window.addEventListener("message", onPosicionPedida);
   window.addEventListener("message", onAvisoBurbuja);
 
+  // Estado activado/desactivado, controlado desde el panel lateral.
+  try {
+    chrome.storage.local.get("avocActiva", (datos) => {
+      if (chrome.runtime.lastError) return;
+      activa = datos.avocActiva !== false;
+    });
+    chrome.storage.onChanged.addListener((cambios, area) => {
+      if (area !== "local" || !cambios.avocActiva) return;
+      activa = cambios.avocActiva.newValue !== false;
+      if (!activa) {
+        cancelarGesto();
+        cerrarBurbuja();
+      }
+    });
+  } catch (error) {
+    // Sin acceso a storage: la extensión se comporta como activada.
+  }
+
   function onSeleccion(evento) {
+    if (!activa) return;
     if (evento.ctrlKey || gesto) return;
     if (!evento.target || !evento.target.closest) return;
     if (evento.target.closest(".avoc-burbuja, .avoc-capa")) return;
@@ -80,7 +100,7 @@
       return;
     }
     if (evento.key === "Control") {
-      if (evento.repeat) return;
+      if (evento.repeat || !activa) return;
       ctrlPulsado = true;
       actualizarCursor();
       return;
@@ -167,6 +187,7 @@
   }
 
   function onPointerDown(evento) {
+    if (!activa) return;
     if (!evento.ctrlKey || evento.button !== 0) return;
     if (evento.pointerType && evento.pointerType !== "mouse") return;
     if (evento.target && evento.target.closest && evento.target.closest(".avoc-burbuja")) {
