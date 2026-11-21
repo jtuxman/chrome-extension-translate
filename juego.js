@@ -318,7 +318,172 @@ async function empezar(modo) {
   el.aciertos.textContent = "0";
   el.fallos.textContent = "0";
 
+  if (modo === "contexto") {
+    empezarContexto(fuente);
+    return;
+  }
   siguientePregunta();
+}
+
+const PLANTILLAS_CONTEXTO = [
+  (glosa) => "En el trabajo, el jefe avisó con " + glosa + " y el equipo se preparó.",
+  (glosa) => "En casa, durante la cena, alguien explicó " + glosa + " con calma.",
+  (glosa) => "En las noticias de la tarde describieron " + glosa + " con un ejemplo.",
+  (glosa) => "Entre amigos, uno mencionó " + glosa + " y los demás entendieron.",
+];
+
+function glosaDe(item) {
+  return limpiarTexto(item.palabra) + "/" + limpiarTexto(item.traduccion);
+}
+
+function frasesEnContexto(item) {
+  const glosa = glosaDe(item);
+  const significado = limpiarTexto(item.traduccion);
+  const hechas = [];
+  const vistas = new Set();
+  function agregar(texto) {
+    const limpio = String(texto || "").replace(/\s+/g, " ").trim();
+    if (!limpio || !limpio.includes(glosa) || vistas.has(limpio)) return;
+    vistas.add(limpio);
+    hechas.push(limpio);
+  }
+  const escapada = significado.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const busqueda = escapada ? new RegExp(escapada, "i") : null;
+  for (const ejemplo of item.ejemplos || []) {
+    const espanol = String(ejemplo.es || "");
+    if (busqueda && busqueda.test(espanol)) agregar(espanol.replace(busqueda, glosa));
+    if (hechas.length >= 4) break;
+  }
+  for (const plantilla of PLANTILLAS_CONTEXTO) agregar(plantilla(glosa));
+  return hechas.slice(0, 4);
+}
+
+function empezarContexto(fuente) {
+  const elegidas = mezclar(fuente.slice()).slice(0, 10);
+  ronda = elegidas.map((item) => ({
+    item,
+    glosa: glosaDe(item),
+    frases: frasesEnContexto(item),
+  }));
+  indice = 0;
+  el.velocidadJuego.hidden = true;
+  mostrarLectura();
+}
+
+function ponerFrase(contenedor, frase, glosa) {
+  const p = document.createElement("p");
+  p.className = "frase-contexto";
+  const partes = frase.split(glosa);
+  p.appendChild(document.createTextNode(partes[0] || ""));
+  const marca = document.createElement("strong");
+  marca.className = "glosa";
+  marca.textContent = glosa;
+  p.appendChild(marca);
+  p.appendChild(document.createTextNode(partes.slice(1).join(glosa)));
+  contenedor.appendChild(p);
+}
+
+function mostrarLectura() {
+  detenerTemporizador();
+  const actual = ronda[indice];
+  el.progresoTexto.textContent = "Lectura " + (indice + 1) + " / " + ronda.length;
+  el.barraFill.style.width = ((indice / ronda.length) * 100).toFixed(0) + "%";
+  el.tarjeta.innerHTML = "";
+
+  const consigna = document.createElement("p");
+  consigna.className = "consigna";
+  consigna.textContent = "Lee la frase en español. La palabra nueva se queda en inglés, con su significado.";
+  el.tarjeta.appendChild(consigna);
+
+  const palabra = document.createElement("div");
+  palabra.className = "palabra-grande";
+  palabra.textContent = limpiarTexto(actual.item.palabra);
+  el.tarjeta.appendChild(palabra);
+
+  actual.frases.forEach((frase) => ponerFrase(el.tarjeta, frase, actual.glosa));
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn-primario";
+  btn.textContent = indice + 1 < ronda.length ? "Siguiente palabra" : "Hacer el examen";
+  btn.addEventListener("click", () => {
+    indice += 1;
+    if (indice < ronda.length) mostrarLectura();
+    else empezarExamen();
+  });
+  el.tarjeta.appendChild(btn);
+}
+
+function empezarExamen() {
+  indice = 0;
+  aciertos = 0;
+  fallos = 0;
+  el.aciertos.textContent = "0";
+  el.fallos.textContent = "0";
+  mostrarExamen();
+}
+
+function mostrarExamen() {
+  detenerTemporizador();
+  if (indice >= ronda.length) {
+    terminar();
+    return;
+  }
+  const actual = ronda[indice];
+  const significado = limpiarTexto(actual.item.traduccion);
+  const palabra = limpiarTexto(actual.item.palabra);
+  const frase = actual.frases[0].split(actual.glosa).join(palabra);
+  const otras = mezclar(
+    ronda
+      .filter((entrada) => entrada !== actual)
+      .map((entrada) => limpiarTexto(entrada.item.traduccion))
+  );
+  const opciones = mezclar([significado, ...otras]).slice(0, 4);
+  if (!opciones.some((opcion) => claveSentido(opcion) === claveSentido(significado))) {
+    opciones[0] = significado;
+  }
+
+  el.progresoTexto.textContent = "Examen " + (indice + 1) + " / " + ronda.length;
+  el.barraFill.style.width = ((indice / ronda.length) * 100).toFixed(0) + "%";
+  el.tarjeta.innerHTML = "";
+
+  const consigna = document.createElement("p");
+  consigna.className = "consigna";
+  consigna.textContent = "¿Qué significa la palabra en inglés?";
+  el.tarjeta.appendChild(consigna);
+  ponerFrase(el.tarjeta, frase, palabra);
+
+  const cont = document.createElement("div");
+  cont.className = "opciones";
+  let respondida = false;
+  opciones.forEach((texto) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "opcion-btn";
+    btn.textContent = texto;
+    btn.addEventListener("click", async () => {
+      if (respondida) return;
+      respondida = true;
+      const acierto = claveSentido(texto) === claveSentido(significado);
+      cont.querySelectorAll(".opcion-btn").forEach((b) => {
+        b.disabled = true;
+        if (claveSentido(b.textContent) === claveSentido(significado)) b.classList.add("correcta");
+        else if (b === btn) b.classList.add("incorrecta");
+      });
+      if (acierto) {
+        aciertos += 1;
+        el.aciertos.textContent = String(aciertos);
+      } else {
+        fallos += 1;
+        el.fallos.textContent = String(fallos);
+      }
+      await actualizarSR(actual.item, acierto);
+      indice += 1;
+      setTimeout(mostrarExamen, 900);
+    });
+    cont.appendChild(btn);
+  });
+  el.tarjeta.appendChild(cont);
 }
 
 function siguientePregunta() {

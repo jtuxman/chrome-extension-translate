@@ -248,6 +248,19 @@ body {
   font-size: 14px;
 }
 
+.frase-contexto {
+  margin: 0;
+  width: 100%;
+  text-align: left;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #344054;
+}
+
+.glosa {
+  color: #6941c6;
+}
+
 /* Reto */
 .tiempo {
   width: 100%;
