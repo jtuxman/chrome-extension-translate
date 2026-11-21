@@ -68,10 +68,14 @@ async function cambiarLetra(delta) {
 const paginaAnterior = document.getElementById("paginaAnterior");
 const paginaSiguiente = document.getElementById("paginaSiguiente");
 const paginaInfo = document.getElementById("paginaInfo");
+const busquedaTraduccion = document.getElementById("busquedaTraduccion");
+let timerBusqueda = null;
+let busquedaEnCurso = 0;
 
 buscar.addEventListener("input", () => {
   paginaActual = 1;
   render();
+  programarTraduccionBusqueda();
 });
 
 paginaAnterior.addEventListener("click", () => {
@@ -211,6 +215,62 @@ function inicioDePeriodo(periodo) {
   return 0;
 }
 
+function coincideBusqueda(it, filtro) {
+  return (
+    (it.palabra || "").toLowerCase().includes(filtro) ||
+    (it.traduccion || "").toLowerCase().includes(filtro) ||
+    (it.variantes || []).some((v) => (v.es || "").toLowerCase().includes(filtro))
+  );
+}
+
+function ocultarTraduccionBusqueda() {
+  busquedaTraduccion.hidden = true;
+  busquedaTraduccion.classList.remove("error");
+  busquedaTraduccion.textContent = "";
+}
+
+function programarTraduccionBusqueda() {
+  clearTimeout(timerBusqueda);
+  const texto = (buscar.value || "").replace(/\s+/g, " ").trim();
+  if (texto.length < 2 || texto.length > 300) {
+    ocultarTraduccionBusqueda();
+    return;
+  }
+  const filtro = texto.toLowerCase();
+  const existe = Object.values(vocabularioActual).some((it) => coincideBusqueda(it, filtro));
+  if (existe) {
+    ocultarTraduccionBusqueda();
+    return;
+  }
+  busquedaTraduccion.hidden = false;
+  busquedaTraduccion.classList.remove("error");
+  busquedaTraduccion.textContent = "Traduciendo «" + texto + "»…";
+  const id = ++busquedaEnCurso;
+  timerBusqueda = setTimeout(() => traducirBusqueda(texto, id), 700);
+}
+
+function traducirBusqueda(texto, id) {
+  chrome.runtime.sendMessage({ tipo: "traducir", texto, contexto: texto, url: "" }, (respuesta) => {
+    if (id !== busquedaEnCurso) return;
+    if ((buscar.value || "").replace(/\s+/g, " ").trim() !== texto) return;
+    if (chrome.runtime.lastError || !respuesta || !respuesta.ok) {
+      busquedaTraduccion.hidden = false;
+      busquedaTraduccion.classList.add("error");
+      busquedaTraduccion.textContent =
+        "No se pudo traducir" +
+        (respuesta && respuesta.error ? ": " + respuesta.error : "");
+      return;
+    }
+    const otras = (respuesta.variantes || [])
+      .map((v) => v.es)
+      .filter((es) => es && es.toLowerCase() !== String(respuesta.traduccion || "").trim().toLowerCase());
+    busquedaTraduccion.classList.remove("error");
+    busquedaTraduccion.hidden = false;
+    busquedaTraduccion.textContent =
+      texto + " → " + respuesta.traduccion + (otras.length ? " (" + otras.join(", ") + ")" : "");
+  });
+}
+
 function enPeriodoLista(it) {
   if (periodoLista === "todas") return true;
   const guardada = Date.parse(it.fecha || "");
@@ -225,11 +285,7 @@ function render() {
     .filter((it) => enPeriodoLista(it))
     .filter((it) => {
       if (!filtro) return true;
-      return (
-        (it.palabra || "").toLowerCase().includes(filtro) ||
-        (it.traduccion || "").toLowerCase().includes(filtro) ||
-        (it.variantes || []).some((v) => (v.es || "").toLowerCase().includes(filtro))
-      );
+      return coincideBusqueda(it, filtro);
     })
     .sort((a, b) => (b.ultimaVez || b.fecha).localeCompare(a.ultimaVez || a.fecha));
 
