@@ -356,6 +356,23 @@ body {
   border-color: #6941c6;
 }
 
+.opcion-btn.seleccionada {
+  border-color: #6941c6;
+  background: #f9f5ff;
+  color: #53389e;
+}
+
+.opcion-btn.omitida {
+  background: #fffaeb;
+  border-color: #f79009;
+  color: #b54708;
+}
+
+.opciones-sentidos {
+  max-width: 520px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .opcion-btn.correcta {
   background: #ecfdf3;
   border-color: #12b76a;

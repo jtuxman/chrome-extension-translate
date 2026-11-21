@@ -8,6 +8,7 @@ const CONFIG_POR_DEFECTO = {
   deepl: { apiKey: "", plan: "free" },
   google: { apiKey: "" },
   gemini: { apiKey: "" },
+  apariencia: { tamanoLetra: 14 },
 };
 
 const el = {
@@ -20,6 +21,9 @@ const el = {
   deeplPlan: document.getElementById("deeplPlan"),
   googleApiKey: document.getElementById("googleApiKey"),
   geminiApiKey: document.getElementById("geminiApiKey"),
+  letraValor: document.getElementById("letraValor"),
+  letraMenos: document.getElementById("letraMenos"),
+  letraMas: document.getElementById("letraMas"),
   guardar: document.getElementById("guardar"),
   probar: document.getElementById("probar"),
   estado: document.getElementById("estado"),
@@ -35,6 +39,26 @@ async function init() {
   el.motores.addEventListener("change", actualizarVisibilidad);
   el.guardar.addEventListener("click", onGuardar);
   el.probar.addEventListener("click", onProbar);
+  el.letraMenos.addEventListener("click", () => moverApariencia(-1));
+  el.letraMas.addEventListener("click", () => moverApariencia(1));
+}
+
+let aparienciaActual = { tamanoLetra: 14 };
+
+function limitarApariencia(datos) {
+  return {
+    tamanoLetra: Math.min(22, Math.max(12, Number(datos.tamanoLetra) || 14)),
+  };
+}
+
+function moverApariencia(delta) {
+  aparienciaActual = limitarApariencia({ tamanoLetra: aparienciaActual.tamanoLetra + delta });
+  pintarApariencia();
+}
+
+function pintarApariencia() {
+  el.letraValor.textContent = aparienciaActual.tamanoLetra + " px";
+  document.documentElement.style.fontSize = aparienciaActual.tamanoLetra + "px";
 }
 
 async function cargarConfig() {
@@ -50,6 +74,7 @@ function fusionar(base, extra) {
     deepl: { ...base.deepl, ...(extra.deepl || {}) },
     google: { ...base.google, ...(extra.google || {}) },
     gemini: { ...base.gemini, ...(extra.gemini || {}) },
+    apariencia: limitarApariencia({ ...base.apariencia, ...(extra.apariencia || {}) }),
   };
 }
 
@@ -67,6 +92,8 @@ function rellenarFormulario(config) {
   el.deeplPlan.value = config.deepl.plan;
   el.googleApiKey.value = config.google.apiKey;
   el.geminiApiKey.value = (config.gemini && config.gemini.apiKey) || "";
+  aparienciaActual = limitarApariencia(config.apariencia || {});
+  pintarApariencia();
 }
 
 function motorSeleccionado() {
@@ -100,6 +127,7 @@ function leerFormulario() {
     gemini: {
       apiKey: el.geminiApiKey.value.trim(),
     },
+    apariencia: limitarApariencia(aparienciaActual),
   };
 }
 

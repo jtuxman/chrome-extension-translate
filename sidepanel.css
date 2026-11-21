@@ -16,6 +16,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 10px;
 }
 
@@ -24,9 +26,37 @@ body {
   margin: 0;
 }
 
+.titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.letra {
+  display: flex;
+  gap: 4px;
+}
+
+.letra button {
+  border: 1px solid #d9dee5;
+  background: #fff;
+  color: #475467;
+  border-radius: 6px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.letra button:hover {
+  border-color: #d6bbfb;
+  color: #6941c6;
+}
+
 .acciones {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -46,33 +76,55 @@ body {
 }
 
 .btn-activar {
-  border: 1px solid #abefc6;
-  background: #ecfdf3;
-  color: #067647;
-  border-radius: 6px;
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
   cursor: pointer;
+  flex-shrink: 0;
+}
+
+.estado-activar {
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.3px;
+  color: #067647;
 }
 
-.btn-activar:hover {
-  background: #d1fadf;
-  border-color: #75e0a7;
+.btn-activar .pista {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  padding: 2px;
+  border-radius: 999px;
+  background: #12b76a;
 }
 
-.btn-activar.inactiva {
-  background: #fef3f2;
-  border-color: #fda29b;
-  color: #b42318;
+.btn-activar .interruptor {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translateX(18px);
+  transition: transform 0.15s ease;
 }
 
-.btn-activar.inactiva:hover {
-  background: #fee4e2;
+.btn-activar.inactiva .estado-activar {
+  color: #667085;
+}
+
+.btn-activar.inactiva .pista {
+  background: #d0d5dd;
+}
+
+.btn-activar.inactiva .interruptor {
+  transform: translateX(0);
 }
 
 .btn-jugar {
+  flex-shrink: 0;
   border: none;
   background: #6941c6;
   color: #fff;
@@ -104,6 +156,9 @@ body {
 }
 
 .btn-borrar-todo {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
   border: 1px solid #d9dee5;
   background: #fff;
   color: #475467;
@@ -124,8 +179,32 @@ body {
   padding: 8px 10px;
   border: 1px solid #d9dee5;
   border-radius: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   font-size: 14px;
+}
+
+.periodos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.btn-periodo {
+  border: 1px solid #d9dee5;
+  background: #fff;
+  color: #475467;
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn-periodo:hover,
+.btn-periodo.activo {
+  border-color: #d6bbfb;
+  background: #f9f5ff;
+  color: #6941c6;
 }
 
 .lista {
@@ -158,6 +237,15 @@ body {
 
 .traduccion {
   color: #1f2933;
+  font-weight: 700;
+  text-align: right;
+}
+
+.variantes {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #475467;
   text-align: right;
 }
 
@@ -235,6 +323,7 @@ body {
 .meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 8px;
   font-size: 11px;
@@ -261,6 +350,7 @@ body {
 
 .btn-borrar {
   margin-left: auto;
+  flex-shrink: 0;
   border: 1px solid #fecdca;
   background: #fff;
   color: #b42318;

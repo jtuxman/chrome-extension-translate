@@ -13,6 +13,7 @@ const CONFIG_POR_DEFECTO = {
   deepl: { apiKey: "", plan: "free" },
   google: { apiKey: "" },
   gemini: { apiKey: "" },
+  apariencia: { tamanoLetra: 14 },
 };
 
 // Canal con el documento offscreen que ejecuta el OCR.
@@ -41,14 +42,44 @@ chrome.runtime.onConnect.addListener((puerto) => {
 });
 
 // Abrir el panel lateral al hacer clic en el icono de la extensión.
-chrome.runtime.onInstalled.addListener(() => {
+function abrirPanelAlClic() {
   if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
     chrome.sidePanel
       .setPanelBehavior({ openPanelOnActionClick: true })
       .catch((err) => console.warn("No se pudo configurar el panel:", err));
   }
+}
+
+abrirPanelAlClic();
+
+chrome.runtime.onInstalled.addListener((detalle) => {
+  abrirPanelAlClic();
   sincronizarDrive().catch((error) => console.warn("Drive:", error));
+  if (detalle && (detalle.reason === "install" || detalle.reason === "update")) {
+    recargarPestanaActual().catch((error) => console.warn("Recarga:", error));
+  }
 });
+
+function esPaginaNormal(url) {
+  return /^https?:/i.test(url || "") || /^file:/i.test(url || "");
+}
+
+async function recargarPestanaActual() {
+  const [activa] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  let pestana = activa && esPaginaNormal(activa.url) ? activa : null;
+  if (!pestana && activa && activa.windowId != null) {
+    const delVentana = await chrome.tabs.query({ windowId: activa.windowId });
+    pestana = delVentana.filter((tab) => esPaginaNormal(tab.url)).pop() || null;
+  }
+  if (pestana && pestana.id != null) await chrome.tabs.reload(pestana.id);
+}
+
+function acotarApariencia(apariencia) {
+  const letra = Number((apariencia || {}).tamanoLetra);
+  return {
+    tamanoLetra: Math.min(22, Math.max(12, Number.isFinite(letra) ? letra : 14)),
+  };
+}
 
 // Escucha los mensajes del content script y de la página de opciones.
 chrome.runtime.onMessage.addListener((mensaje, sender, sendResponse) => {
@@ -143,8 +174,10 @@ async function manejarTraduccion(mensaje, sender) {
   }
 
   const config = await obtenerConfig();
+  const variantesP = variantesDe(texto, config);
   const traduccion = (await traducir(texto, config)).replace(/\s+[-–—]+\s*$/, "");
-  const deshacer = await guardarEnVocabulario({ texto, traduccion, contexto, url });
+  const variantes = completarVariantes(traduccion, await variantesP);
+  const deshacer = await guardarEnVocabulario({ texto, traduccion, contexto, url, variantes });
 
   // Qué copiar al portapapeles: si el texto original ya está en español, solo
   // el texto; si está en inglés (u otro idioma), la traducción y el original.
@@ -160,7 +193,17 @@ async function manejarTraduccion(mensaje, sender) {
   const detallePendiente = !esEspanol && sirveParaDetalle(texto) && necesitaDetalle(ficha || { palabra: texto });
   if (detallePendiente) programarEnriquecimiento(texto.toLowerCase());
 
-  return { ok: true, traduccion, idioma, esEspanol, textoCopiar, deshacer, detalle, detallePendiente };
+  return {
+    ok: true,
+    traduccion,
+    variantes,
+    idioma,
+    esEspanol,
+    textoCopiar,
+    deshacer,
+    detalle,
+    detallePendiente,
+  };
 }
 
 async function fichaDe(texto) {
@@ -216,6 +259,7 @@ function fusionarConfig(base, extra) {
     deepl: { ...base.deepl, ...(extra.deepl || {}) },
     google: { ...base.google, ...(extra.google || {}) },
     gemini: { ...base.gemini, ...(extra.gemini || {}) },
+    apariencia: acotarApariencia({ ...base.apariencia, ...(extra.apariencia || {}) }),
   };
 }
 
@@ -223,19 +267,20 @@ function fusionarConfig(base, extra) {
 
 // Se consultan a la vez los motores disponibles. Si el elegido tarda o falla,
 // responde el primero de los demás que entregue una traducción real.
-const TIEMPO_MOTOR_MS = 8000;
-const ESPERA_PREFERIDO_MS = 700;
+const TIEMPO_MOTOR_MS = 5000;
+const ESPERA_PREFERIDO = { deepl: 700, google: 700, chrome: 500 };
 
 async function traducir(texto, config) {
   const preferido = config.motor || "mymemory";
-  const motores = ["mymemory"];
+  const control = new AbortController();
+  const motores = ["gtx", "mymemory"];
   if (config.libre && config.libre.url) motores.push("libretranslate");
   if (config.deepl && config.deepl.apiKey) motores.push("deepl");
   if (config.google && config.google.apiKey) motores.push("google");
 
   const tareas = motores.map((motor) => ({
     motor,
-    promesa: conTiempo(traducirMotor(motor, texto, config), TIEMPO_MOTOR_MS),
+    promesa: conTiempo(traducirMotor(motor, texto, config, control.signal), TIEMPO_MOTOR_MS),
   }));
   // Chrome se suma a la carrera sin retrasar a los demás: primero se comprueba
   // si el modelo ya está descargado.
@@ -249,7 +294,11 @@ async function traducir(texto, config) {
       TIEMPO_MOTOR_MS
     ),
   });
-  return primeraRespuesta(tareas, texto, preferido);
+  try {
+    return await primeraRespuesta(tareas, texto, preferido);
+  } finally {
+    control.abort();
+  }
 }
 
 async function chromePuedeTraducir(config) {
@@ -271,19 +320,21 @@ async function chromePuedeTraducir(config) {
   }
 }
 
-function traducirMotor(motor, texto, config) {
+function traducirMotor(motor, texto, config, signal) {
   switch (motor) {
+    case "gtx":
+      return traducirGooglePublico(texto, config, signal);
     case "libretranslate":
-      return traducirLibre(texto, config);
+      return traducirLibre(texto, config, signal);
     case "chrome":
       return traducirChrome(texto, config);
     case "deepl":
-      return traducirDeepL(texto, config);
+      return traducirDeepL(texto, config, signal);
     case "google":
-      return traducirGoogle(texto, config);
+      return traducirGoogle(texto, config, signal);
     case "mymemory":
     default:
-      return traducirMyMemory(texto, config);
+      return traducirMyMemory(texto, config, signal);
   }
 }
 
@@ -359,7 +410,9 @@ function primeraRespuesta(tareas, origen, preferido) {
             }
             if (!respaldo) {
               respaldo = limpia;
-              espera = setTimeout(() => usar(respaldo), ESPERA_PREFERIDO_MS);
+              const pausa = ESPERA_PREFERIDO[preferido] || 0;
+              if (pausa === 0) usar(limpia);
+              else espera = setTimeout(() => usar(respaldo), pausa);
             }
             return;
           }
@@ -378,7 +431,23 @@ function primeraRespuesta(tareas, origen, preferido) {
   });
 }
 
-async function traducirMyMemory(texto, config) {
+async function traducirGooglePublico(texto, config, signal) {
+  const endpoint = new URL("https://translate.googleapis.com/translate_a/single");
+  endpoint.searchParams.set("client", "gtx");
+  endpoint.searchParams.set("sl", config.sourceLang || "en");
+  endpoint.searchParams.set("tl", config.targetLang || "es");
+  endpoint.searchParams.set("dt", "t");
+  endpoint.searchParams.set("q", texto);
+
+  const respuesta = await fetch(endpoint.toString(), { signal });
+  if (!respuesta.ok) throw new Error("Google público HTTP " + respuesta.status);
+  const datos = await respuesta.json();
+  const traduccion = ((datos && datos[0]) || []).map((parte) => (parte && parte[0]) || "").join("");
+  if (!traduccion.trim()) throw new Error("Google público: sin traducción");
+  return traduccion;
+}
+
+async function traducirMyMemory(texto, config, signal) {
   const endpoint = new URL("https://api.mymemory.translated.net/get");
   endpoint.searchParams.set("q", texto);
   endpoint.searchParams.set(
@@ -386,7 +455,7 @@ async function traducirMyMemory(texto, config) {
     config.sourceLang + "|" + config.targetLang
   );
 
-  const respuesta = await fetch(endpoint.toString());
+  const respuesta = await fetch(endpoint.toString(), { signal });
   if (!respuesta.ok) throw new Error("MyMemory HTTP " + respuesta.status);
 
   const datos = await respuesta.json();
@@ -395,7 +464,7 @@ async function traducirMyMemory(texto, config) {
   return traduccion;
 }
 
-async function traducirLibre(texto, config) {
+async function traducirLibre(texto, config, signal) {
   const url = config.libre.url || CONFIG_POR_DEFECTO.libre.url;
   const cuerpo = {
     q: texto,
@@ -409,6 +478,7 @@ async function traducirLibre(texto, config) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(cuerpo),
+    signal,
   });
   if (!respuesta.ok) throw new Error("LibreTranslate HTTP " + respuesta.status);
 
@@ -455,7 +525,7 @@ async function traducirChrome(texto, config) {
   return traduccion;
 }
 
-async function traducirDeepL(texto, config) {
+async function traducirDeepL(texto, config, signal) {
   if (!config.deepl.apiKey) throw new Error("Falta la API key de DeepL");
 
   const base =
@@ -475,6 +545,7 @@ async function traducirDeepL(texto, config) {
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: params.toString(),
+    signal,
   });
   if (!respuesta.ok) throw new Error("DeepL HTTP " + respuesta.status);
 
@@ -484,7 +555,7 @@ async function traducirDeepL(texto, config) {
   return traduccion;
 }
 
-async function traducirGoogle(texto, config) {
+async function traducirGoogle(texto, config, signal) {
   if (!config.google.apiKey) throw new Error("Falta la API key de Google");
 
   const endpoint = new URL("https://translation.googleapis.com/language/translate/v2");
@@ -493,6 +564,7 @@ async function traducirGoogle(texto, config) {
   const respuesta = await fetch(endpoint.toString(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    signal,
     body: JSON.stringify({
       q: texto,
       source: config.sourceLang,
@@ -510,7 +582,87 @@ async function traducirGoogle(texto, config) {
 
 // --- Persistencia del vocabulario -------------------------------------------
 
-async function guardarEnVocabulario({ texto, traduccion, contexto, url }) {
+async function variantesDe(texto, config) {
+  const limpio = String(texto || "").replace(/\s+/g, " ").trim();
+  if (!limpio || limpio.length > 40 || limpio.split(" ").length > 3 || /[.!?]/.test(limpio)) {
+    return [];
+  }
+  try {
+    return await conTiempo(pedirVariantes(limpio, config), 1500);
+  } catch (error) {
+    return [];
+  }
+}
+
+async function pedirVariantes(texto, config) {
+  const endpoint = new URL("https://translate.googleapis.com/translate_a/single");
+  endpoint.searchParams.set("client", "gtx");
+  endpoint.searchParams.set("sl", config.sourceLang || "en");
+  endpoint.searchParams.set("tl", config.targetLang || "es");
+  endpoint.searchParams.set("dt", "bd");
+  endpoint.searchParams.append("dt", "t");
+  endpoint.searchParams.set("q", texto);
+  const respuesta = await fetch(endpoint.toString());
+  if (!respuesta.ok) return [];
+  const datos = await respuesta.json();
+  return leerVariantes(datos, texto);
+}
+
+const TIPOS_VARIANTE = {
+  noun: "sustantivo",
+  verb: "verbo",
+  adjective: "adjetivo",
+  adverb: "adverbio",
+  pronoun: "pronombre",
+  preposition: "preposición",
+  conjunction: "conjunción",
+  interjection: "interjección",
+};
+
+function leerVariantes(datos, origen) {
+  const bloque = datos && datos[1];
+  if (!Array.isArray(bloque)) return [];
+  const buscada = origen.toLowerCase();
+  const lista = [];
+  for (const grupo of bloque) {
+    if (!Array.isArray(grupo)) continue;
+    const tipo = TIPOS_VARIANTE[grupo[0]] || "";
+    for (const fila of grupo[2] || []) {
+      const es = String((fila && fila[0]) || "").replace(/\s+/g, " ").trim();
+      const reverso = ((fila && fila[1]) || []).map((item) => String(item).toLowerCase());
+      const peso = Number(fila && fila[3]) || 0;
+      if (!es || peso < 0.004) continue;
+      if (reverso.length && !reverso.some((item) => item === buscada || item.includes(buscada))) continue;
+      lista.push({ tipo, es, peso });
+    }
+  }
+  lista.sort((a, b) => b.peso - a.peso);
+  const unicas = [];
+  for (const item of lista) {
+    const clave = item.es.toLowerCase();
+    if (unicas.some((otra) => otra.es.toLowerCase() === clave)) continue;
+    unicas.push({ tipo: item.tipo, es: item.es });
+    if (unicas.length >= 5) break;
+  }
+  return unicas;
+}
+
+function completarVariantes(principal, variantes) {
+  const lista = [];
+  const vista = new Set();
+  function agregar(texto, tipo) {
+    const es = String(texto || "").replace(/\s+[-–—]+\s*$/, "").replace(/\s+/g, " ").trim();
+    const clave = es.toLowerCase();
+    if (!es || vista.has(clave) || lista.length >= 5) return;
+    vista.add(clave);
+    lista.push({ tipo: tipo || "", es });
+  }
+  agregar(principal, "");
+  for (const variante of variantes || []) agregar(variante.es, variante.tipo);
+  return lista.length >= 2 ? lista : [];
+}
+
+async function guardarEnVocabulario({ texto, traduccion, contexto, url, variantes }) {
   const clave = texto.toLowerCase();
   const almacen = await chrome.storage.local.get(STORAGE_KEY);
   const vocabulario = almacen[STORAGE_KEY] || {};
@@ -522,6 +674,7 @@ async function guardarEnVocabulario({ texto, traduccion, contexto, url }) {
     existente.ultimaVez = new Date().toISOString();
     if (contexto) existente.contexto = contexto;
     if (url) existente.url = url;
+    if (variantes && variantes.length) existente.variantes = variantes;
   } else {
     vocabulario[clave] = {
       palabra: texto,
@@ -531,6 +684,7 @@ async function guardarEnVocabulario({ texto, traduccion, contexto, url }) {
       fecha: new Date().toISOString(),
       ultimaVez: new Date().toISOString(),
       vecesVista: 1,
+      variantes: variantes && variantes.length ? variantes : [],
     };
   }
 

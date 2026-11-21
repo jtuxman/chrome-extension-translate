@@ -43,6 +43,13 @@
 
 .avoc-traduccion {
   color: #1f2933;
+  font-weight: 700;
+}
+
+.avoc-variantes {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #344054;
 }
 
 .avoc-detalle {

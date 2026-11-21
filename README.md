@@ -54,6 +54,8 @@ Pestaña con texto
 Desde el panel lateral, el botón **Jugar** abre `juego.html` (en una pestaña
 nueva). Los juegos usan las palabras que ya tienes guardadas:
 
+- **Sentidos:** ves una palabra y varias opciones. Marcas todas las traducciones
+  posibles y dejas sin marcar las que no lo son.
 - **Reto:** 10 opciones parecidas entre sí y una barra de tiempo (teclas
   1–9 y 0). La velocidad, también en los otros juegos, se elige en Lento (25 s),
   Normal (15 s) o Rápido (8 s). Al empezar queda en Lento.

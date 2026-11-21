@@ -14,7 +14,6 @@
     "https://translation.googleapis.com/*",
     "https://www.googleapis.com/*"
   ],
-  "optional_host_permissions": ["https://*/*"],
   "options_page": "options.html",
   "background": {
     "service_worker": "background.js"

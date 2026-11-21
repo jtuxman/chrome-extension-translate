@@ -8,15 +8,24 @@
   </head>
   <body>
     <header class="cabecera">
-      <h1>Mi vocabulario</h1>
+      <div class="titulo">
+        <h1>Mi vocabulario</h1>
+        <div class="letra">
+          <button id="letraMenos" type="button" title="Letra más pequeña">A−</button>
+          <button id="letraMas" type="button" title="Letra más grande">A+</button>
+        </div>
+      </div>
       <div class="acciones">
         <button
           id="activar"
           class="btn-activar"
           type="button"
+          role="switch"
+          aria-checked="true"
           title="Activar o desactivar la traducción al seleccionar texto"
         >
-          Inhabilitar
+          <span class="estado-activar">Encendido</span>
+          <span class="pista" aria-hidden="true"><span class="interruptor"></span></span>
         </button>
         <span id="racha" class="racha-chip" title="Días seguidos practicando">🔥 0</span>
         <span id="contador" class="contador">0 palabras</span>
@@ -25,9 +34,6 @@
         </button>
         <button id="ajustes" class="btn-ajustes" title="Ajustes">
           Ajustes
-        </button>
-        <button id="borrarTodo" class="btn-borrar-todo" title="Borrar todo">
-          Vaciar
         </button>
       </div>
     </header>
@@ -38,6 +44,13 @@
       type="search"
       placeholder="Buscar palabra…"
     />
+
+    <div class="periodos" role="group" aria-label="Filtrar por fecha">
+      <button type="button" class="btn-periodo activo" data-periodo="todas">Todas</button>
+      <button type="button" class="btn-periodo" data-periodo="semana">Semana</button>
+      <button type="button" class="btn-periodo" data-periodo="mes">Mes</button>
+      <button type="button" class="btn-periodo" data-periodo="tres">3 meses</button>
+    </div>
 
     <ul id="lista" class="lista"></ul>
 
@@ -64,6 +77,10 @@
         <input id="archivoImport" type="file" accept="application/json" hidden />
       </div>
     </footer>
+
+    <button id="borrarTodo" class="btn-borrar-todo" type="button" title="Borrar todo">
+      Vaciar
+    </button>
 
     <script src="sidepanel.js"></script>
   </body>

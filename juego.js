@@ -281,6 +281,7 @@ async function empezar(modo) {
     if (!tieneTraduccion(item)) return false;
     if (modo === "escribir") return esPalabraCorta(item);
     if (modo === "reto") return sirveParaReto(item);
+    if (modo === "sentidos") return traduccionesDe(item).length >= 2;
     return true;
   };
   const delPeriodo = listaItems().filter((it) => enPeriodo(it));
@@ -297,7 +298,9 @@ async function empezar(modo) {
           ? datos.vacio + " Elige otro periodo en «Palabras guardadas»."
           : delPeriodo.every((it) => !tieneTraduccion(it))
             ? "Estas palabras no tienen una traducción distinta del inglés, así que no entran al juego."
-            : modo === "escribir"
+            : modo === "sentidos"
+              ? "Sentidos usa palabras con varias traducciones. Vuelve a traducir algunas para que se guarden."
+              : modo === "escribir"
               ? "Para Escribir hacen falta palabras sueltas; las frases no entran en este juego."
               : "No hay palabras que sirvan para este juego.";
       el.avisoModo.hidden = false;
@@ -330,8 +333,116 @@ function siguientePregunta() {
   el.barraFill.style.width = ((indice / ronda.length) * 100).toFixed(0) + "%";
 
   if (modoActual === "reto") renderReto(item);
+  else if (modoActual === "sentidos") renderSentidos(item);
   else if (modoActual === "opcion") renderOpcionMultiple(item);
   else renderEscribir(item);
+}
+
+function traduccionesDe(item) {
+  const lista = [];
+  const vistas = new Set();
+  function agregar(texto) {
+    const es = limpiarTexto(texto);
+    const clave = claveSentido(es);
+    if (!clave || vistas.has(clave)) return;
+    vistas.add(clave);
+    lista.push(es);
+  }
+  agregar(item && item.traduccion);
+  for (const variante of (item && item.variantes) || []) agregar(variante.es || variante);
+  return lista.slice(0, 4);
+}
+
+function renderSentidos(item) {
+  el.tarjeta.innerHTML = "";
+  const correctas = traduccionesDe(item);
+  const buenas = new Set(correctas.map(claveSentido));
+  const opciones = mezclar(correctas.concat(distractoresDe(buenas, 3)));
+
+  const consigna = document.createElement("p");
+  consigna.className = "consigna";
+  consigna.textContent = "Marca todas las traducciones posibles. No marques las que no lo son.";
+  el.tarjeta.appendChild(consigna);
+
+  const palabra = document.createElement("div");
+  palabra.className = "palabra-grande";
+  palabra.textContent = limpiarTexto(item.palabra);
+  el.tarjeta.appendChild(palabra);
+
+  const cont = document.createElement("div");
+  cont.className = "opciones opciones-sentidos";
+  let cerrada = false;
+
+  function comprobar(porTiempo) {
+    if (cerrada) return;
+    cerrada = true;
+    detenerTemporizador();
+    const elegidas = new Set(
+      [...cont.querySelectorAll(".opcion-btn.seleccionada")].map((b) => claveSentido(b.dataset.valor))
+    );
+    const acierto =
+      !porTiempo &&
+      elegidas.size === buenas.size &&
+      [...buenas].every((clave) => elegidas.has(clave));
+    cont.querySelectorAll(".opcion-btn").forEach((b) => {
+      b.disabled = true;
+      const clave = claveSentido(b.dataset.valor);
+      if (buenas.has(clave) && elegidas.has(clave)) b.classList.add("correcta");
+      else if (buenas.has(clave)) b.classList.add("omitida");
+      else if (elegidas.has(clave)) b.classList.add("incorrecta");
+    });
+    const feedback = document.createElement("div");
+    feedback.className = "feedback " + (acierto ? "ok" : "mal");
+    feedback.textContent = acierto
+      ? "¡Correcto!"
+      : porTiempo
+        ? "Se acabó el tiempo. Las posibles son: " + correctas.join(", ") + "."
+        : "Las posibles son: " + correctas.join(", ") + ".";
+    el.tarjeta.appendChild(feedback);
+    mostrarSiguiente(item, acierto);
+  }
+
+  el.tarjeta.appendChild(iniciarBarra(() => comprobar(true)));
+
+  opciones.forEach((texto) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "opcion-btn";
+    btn.dataset.valor = texto;
+    btn.textContent = texto;
+    btn.addEventListener("click", () => {
+      if (cerrada) return;
+      btn.classList.toggle("seleccionada");
+    });
+    cont.appendChild(btn);
+  });
+  el.tarjeta.appendChild(cont);
+
+  const listo = document.createElement("button");
+  listo.type = "button";
+  listo.className = "btn-primario";
+  listo.textContent = "Comprobar";
+  listo.addEventListener("click", () => comprobar(false));
+  el.tarjeta.appendChild(listo);
+}
+
+function distractoresDe(prohibidas, cantidad) {
+  const salida = [];
+  const candidatos = mezclar(
+    listaItems()
+      .filter(tieneTraduccion)
+      .map((it) => textoRespuesta(it))
+      .concat(RELLENO_ES)
+  );
+  for (const texto of candidatos) {
+    const limpio = limpiarTexto(texto);
+    const clave = claveSentido(limpio);
+    if (!clave || prohibidas.has(clave)) continue;
+    if (salida.some((item) => claveSentido(item) === clave)) continue;
+    salida.push(limpio);
+    if (salida.length >= cantidad) break;
+  }
+  return salida;
 }
 
 // --- Modo: Reto (10 opciones, sinónimos y tiempo) ---------------------------

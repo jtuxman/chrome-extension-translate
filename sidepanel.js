@@ -21,14 +21,59 @@ const driveConectar = document.getElementById("driveConectar");
 const driveDesconectar = document.getElementById("driveDesconectar");
 
 let vocabularioActual = {};
+let periodoLista = "todas";
+
+const letraMenos = document.getElementById("letraMenos");
+const letraMas = document.getElementById("letraMas");
 
 document.addEventListener("DOMContentLoaded", () => {
   cargar();
   cargarActiva();
   prepararDrive();
+  aplicarLetraGuardada();
 });
 
+letraMenos.addEventListener("click", () => cambiarLetra(-1));
+letraMas.addEventListener("click", () => cambiarLetra(1));
+
+function limitarLetra(valor) {
+  return Math.min(22, Math.max(12, Number(valor) || 14));
+}
+
+function pintarLetra(px) {
+  document.body.style.zoom = limitarLetra(px) / 14;
+}
+
+async function aplicarLetraGuardada() {
+  const { config } = await chrome.storage.sync.get("config");
+  const px = config && config.apariencia && config.apariencia.tamanoLetra;
+  pintarLetra(px);
+}
+
+async function cambiarLetra(delta) {
+  const { config } = await chrome.storage.sync.get("config");
+  const actual = (config && config.apariencia) || {};
+  const tamanoLetra = limitarLetra((actual.tamanoLetra || 14) + delta);
+  await chrome.storage.sync.set({
+    config: {
+      ...(config || {}),
+      apariencia: { ...actual, tamanoLetra },
+    },
+  });
+  pintarLetra(tamanoLetra);
+}
+
 buscar.addEventListener("input", render);
+
+document.querySelectorAll(".btn-periodo").forEach((boton) => {
+  boton.addEventListener("click", () => {
+    periodoLista = boton.dataset.periodo || "todas";
+    document.querySelectorAll(".btn-periodo").forEach((otro) => {
+      otro.classList.toggle("activo", otro === boton);
+    });
+    render();
+  });
+});
 
 // Interruptor para pausar la traducción al seleccionar mientras trabajas
 // en otra cosa. El estado se guarda y lo lee el content script.
@@ -45,8 +90,9 @@ async function cargarActiva() {
 }
 
 function pintarActiva(activa) {
-  activar.textContent = activa ? "ACTIVA" : "INACTIVA";
   activar.classList.toggle("inactiva", !activa);
+  activar.setAttribute("aria-checked", activa ? "true" : "false");
+  activar.querySelector(".estado-activar").textContent = activa ? "Encendido" : "Apagado";
   activar.title = activa
     ? "Traducción activada. Pulsa para desactivarla mientras trabajas en otra cosa."
     : "Traducción desactivada. Pulsa para volver a activarla.";
@@ -77,6 +123,10 @@ borrarTodo.addEventListener("click", async () => {
 // Se actualiza solo cuando el service worker guarda una palabra nueva
 // o cuando los juegos actualizan la racha.
 chrome.storage.onChanged.addListener((cambios, area) => {
+  if (area === "sync" && cambios.config) {
+    const nuevo = cambios.config.newValue || {};
+    pintarLetra(nuevo.apariencia && nuevo.apariencia.tamanoLetra);
+  }
   if (area !== "local") return;
   if (cambios[STORAGE_KEY]) {
     vocabularioActual = cambios[STORAGE_KEY].newValue || {};
@@ -121,15 +171,44 @@ function fechaLocal(d) {
   return y + "-" + m + "-" + dia;
 }
 
+function inicioDePeriodo(periodo) {
+  const ahora = new Date();
+  ahora.setHours(0, 0, 0, 0);
+  if (periodo === "semana") {
+    const dia = ahora.getDay();
+    const hastaLunes = dia === 0 ? 6 : dia - 1;
+    ahora.setDate(ahora.getDate() - hastaLunes);
+    return ahora.getTime();
+  }
+  if (periodo === "mes") {
+    ahora.setMonth(ahora.getMonth() - 1);
+    return ahora.getTime();
+  }
+  if (periodo === "tres") {
+    ahora.setMonth(ahora.getMonth() - 3);
+    return ahora.getTime();
+  }
+  return 0;
+}
+
+function enPeriodoLista(it) {
+  if (periodoLista === "todas") return true;
+  const guardada = Date.parse(it.fecha || "");
+  if (!guardada) return false;
+  return guardada >= inicioDePeriodo(periodoLista);
+}
+
 function render() {
   const filtro = (buscar.value || "").toLowerCase().trim();
 
   const items = Object.values(vocabularioActual)
+    .filter((it) => enPeriodoLista(it))
     .filter((it) => {
       if (!filtro) return true;
       return (
         (it.palabra || "").toLowerCase().includes(filtro) ||
-        (it.traduccion || "").toLowerCase().includes(filtro)
+        (it.traduccion || "").toLowerCase().includes(filtro) ||
+        (it.variantes || []).some((v) => (v.es || "").toLowerCase().includes(filtro))
       );
     })
     .sort((a, b) => (b.ultimaVez || b.fecha).localeCompare(a.ultimaVez || a.fecha));
@@ -141,9 +220,11 @@ function render() {
 
   if (items.length === 0) {
     vacio.style.display = "block";
-    vacio.textContent = total
-      ? "Sin resultados para tu búsqueda."
-      : "Selecciona una palabra en inglés en cualquier página para empezar a construir tu vocabulario.";
+    vacio.textContent = !total
+      ? "Selecciona una palabra en inglés en cualquier página para empezar a construir tu vocabulario."
+      : filtro
+        ? "Sin resultados para tu búsqueda."
+        : "No hay palabras guardadas en este periodo.";
     return;
   }
   vacio.style.display = "none";
@@ -171,6 +252,16 @@ function crearItem(it) {
   fila.appendChild(palabra);
   fila.appendChild(traduccion);
   li.appendChild(fila);
+
+  const otras = (it.variantes || [])
+    .map((v) => (v && v.es) || "")
+    .filter((es) => es && es.toLowerCase() !== String(it.traduccion || "").trim().toLowerCase());
+  if (otras.length) {
+    const variantes = document.createElement("p");
+    variantes.className = "variantes";
+    variantes.textContent = otras.join(", ");
+    li.appendChild(variantes);
+  }
 
   if (it.contexto) {
     const contexto = document.createElement("p");
@@ -467,6 +558,7 @@ function normalizarImportado(datos) {
       aciertos: item.aciertos || 0,
       fallos: item.fallos || 0,
       proximoRepaso: item.proximoRepaso || null,
+      variantes: Array.isArray(item.variantes) ? item.variantes : [],
       acepciones: Array.isArray(item.acepciones) ? item.acepciones : [],
       ejemplos: Array.isArray(item.ejemplos) ? item.ejemplos : [],
       detalleFuente: item.detalleFuente || "",

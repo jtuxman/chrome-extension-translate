@@ -10,6 +10,7 @@
   let gesto = null;
   const enMarco = window.top !== window;
   let marcoConBurbuja = null;
+  let tamanoLetra = 14;
   let deshacerActual = null; // cómo quitar del diccionario la traducción visible
   let descartarPendiente = 0; // id de la solicitud que se cerró con Escape
   let ultimaSeleccion = { texto: "", momento: 0 };
@@ -523,7 +524,13 @@
         }
         if (respuesta && respuesta.ok) {
           deshacerActual = respuesta.deshacer || null;
-          actualizarBurbuja(respuesta.traduccion, texto, respuesta.detalle, respuesta.detallePendiente);
+          actualizarBurbuja(
+            respuesta.traduccion,
+            texto,
+            respuesta.detalle,
+            respuesta.detallePendiente,
+            respuesta.variantes
+          );
           const aCopiar = respuesta.textoCopiar || respuesta.traduccion;
           copiarAlPortapapeles(aCopiar).then((copiado) => {
             if (copiado && id === solicitud) marcarCopiado(respuesta.esEspanol);
@@ -831,10 +838,31 @@
     }
 
     burbujaActual = burbuja;
+    aplicarTamanoLetra();
     avisarAlPrincipal("burbuja-abierta");
   }
 
-  function actualizarBurbuja(traduccion, palabra, detalle, pendiente) {
+  function aplicarTamanoLetra() {
+    if (!burbujaActual) return;
+    burbujaActual.style.zoom = Math.min(22, Math.max(12, tamanoLetra)) / 14;
+  }
+
+  chrome.storage.sync.get("config", (datos) => {
+    const px = datos && datos.config && datos.config.apariencia && datos.config.apariencia.tamanoLetra;
+    if (px) tamanoLetra = px;
+    aplicarTamanoLetra();
+  });
+
+  chrome.storage.onChanged.addListener((cambios, area) => {
+    if (area !== "sync" || !cambios.config) return;
+    const nuevo = cambios.config.newValue || {};
+    const px = nuevo.apariencia && nuevo.apariencia.tamanoLetra;
+    if (!px) return;
+    tamanoLetra = px;
+    aplicarTamanoLetra();
+  });
+
+  function actualizarBurbuja(traduccion, palabra, detalle, pendiente, variantes) {
     if (!burbujaActual) return;
     const contenido = burbujaActual.querySelector(".avoc-contenido");
     if (!contenido) return;
@@ -852,8 +880,27 @@
     trad.className = "avoc-traduccion";
     trad.textContent = traduccion;
     contenido.appendChild(trad);
+    pintarVariantes(variantes, traduccion);
     pintarDetalle(detalle, pendiente);
     pintarEnlaces(palabra);
+  }
+
+  function pintarVariantes(variantes, principal) {
+    if (!burbujaActual) return;
+    const contenido = burbujaActual.querySelector(".avoc-contenido");
+    if (!contenido) return;
+    const previo = contenido.querySelector(".avoc-variantes");
+    if (previo) previo.remove();
+    const otras = (variantes || []).filter(
+      (item) => item && item.es && item.es.toLowerCase() !== String(principal || "").trim().toLowerCase()
+    );
+    if (!otras.length) return;
+
+    const bloque = document.createElement("p");
+    bloque.className = "avoc-variantes";
+    bloque.textContent = otras.map((variante) => variante.es).join(", ");
+    const ancla = contenido.querySelector(".avoc-detalle") || contenido.querySelector(".avoc-mas");
+    contenido.insertBefore(bloque, ancla);
   }
 
   function terminoBusqueda(palabra) {
