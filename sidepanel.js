@@ -22,6 +22,8 @@ const driveDesconectar = document.getElementById("driveDesconectar");
 
 let vocabularioActual = {};
 let periodoLista = "todas";
+let paginaActual = 1;
+const POR_PAGINA = 20;
 
 const letraMenos = document.getElementById("letraMenos");
 const letraMas = document.getElementById("letraMas");
@@ -63,11 +65,29 @@ async function cambiarLetra(delta) {
   pintarLetra(tamanoLetra);
 }
 
-buscar.addEventListener("input", render);
+const paginaAnterior = document.getElementById("paginaAnterior");
+const paginaSiguiente = document.getElementById("paginaSiguiente");
+const paginaInfo = document.getElementById("paginaInfo");
+
+buscar.addEventListener("input", () => {
+  paginaActual = 1;
+  render();
+});
+
+paginaAnterior.addEventListener("click", () => {
+  paginaActual -= 1;
+  render();
+});
+
+paginaSiguiente.addEventListener("click", () => {
+  paginaActual += 1;
+  render();
+});
 
 document.querySelectorAll(".btn-periodo").forEach((boton) => {
   boton.addEventListener("click", () => {
     periodoLista = boton.dataset.periodo || "todas";
+    paginaActual = 1;
     document.querySelectorAll(".btn-periodo").forEach((otro) => {
       otro.classList.toggle("activo", otro === boton);
     });
@@ -216,6 +236,16 @@ function render() {
   const total = Object.keys(vocabularioActual).length;
   contador.textContent = total === 1 ? "1 palabra" : total + " palabras";
 
+  const paginas = Math.max(1, Math.ceil(items.length / POR_PAGINA));
+  if (paginaActual > paginas) paginaActual = paginas;
+  if (paginaActual < 1) paginaActual = 1;
+  const inicio = (paginaActual - 1) * POR_PAGINA;
+  const pagina = items.slice(inicio, inicio + POR_PAGINA);
+
+  paginaInfo.textContent = "Página " + paginaActual + " de " + paginas;
+  paginaAnterior.disabled = paginaActual <= 1;
+  paginaSiguiente.disabled = paginaActual >= paginas;
+
   lista.innerHTML = "";
 
   if (items.length === 0) {
@@ -229,7 +259,7 @@ function render() {
   }
   vacio.style.display = "none";
 
-  for (const it of items) {
+  for (const it of pagina) {
     lista.appendChild(crearItem(it));
   }
 }
