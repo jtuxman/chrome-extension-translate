@@ -183,6 +183,17 @@ body {
   font-size: 14px;
 }
 
+.busqueda-traduccion {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #344054;
+}
+
+.busqueda-traduccion.error {
+  color: #b42318;
+}
+
 .paginacion {
   display: flex;
   align-items: center;
