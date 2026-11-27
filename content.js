@@ -76,7 +76,7 @@
     if (!seleccion || seleccion.isCollapsed) return;
 
     const texto = seleccion.toString().trim();
-    if (!texto || texto.length > 200) return;
+    if (!texto || texto.length > 500) return;
 
     const contexto = obtenerContexto(seleccion, texto);
     const rect = obtenerRect(seleccion);
@@ -91,7 +91,7 @@
     ultimaSeleccion = { texto, momento: ahora };
 
     const id = ++solicitud;
-    pedirTraduccion(rect, texto, id, contexto);
+    pedirTraduccion(rect, limitarTexto(texto), id, contexto);
   }
 
   function onTeclaAbajo(evento) {
