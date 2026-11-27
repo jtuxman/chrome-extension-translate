@@ -55,13 +55,49 @@ abrirPanelAlClic();
 chrome.runtime.onInstalled.addListener((detalle) => {
   abrirPanelAlClic();
   configurarRedireccionPdf();
+  sincronizarIcono();
   sincronizarDrive().catch((error) => console.warn("Drive:", error));
   if (detalle && (detalle.reason === "install" || detalle.reason === "update")) {
     recargarPestanaActual().catch((error) => console.warn("Recarga:", error));
   }
 });
 
-chrome.runtime.onStartup.addListener(configurarRedireccionPdf);
+chrome.runtime.onStartup.addListener(() => {
+  configurarRedireccionPdf();
+  sincronizarIcono();
+});
+
+// El icono de la barra muestra el estado: verde cuando la traducción está
+// activa y rojo cuando está inhabilitada (mismo interruptor del panel).
+function actualizarIcono(activa) {
+  if (!chrome.action || !chrome.action.setIcon) return;
+  const sufijo = activa ? "" : "-rojo";
+  chrome.action
+    .setIcon({
+      path: {
+        16: "icons/icon16" + sufijo + ".png",
+        48: "icons/icon48" + sufijo + ".png",
+        128: "icons/icon128" + sufijo + ".png",
+      },
+    })
+    .catch(() => {});
+}
+
+async function sincronizarIcono() {
+  try {
+    const { avocActiva } = await chrome.storage.local.get("avocActiva");
+    actualizarIcono(avocActiva !== false);
+  } catch (error) {
+    actualizarIcono(true);
+  }
+}
+
+sincronizarIcono();
+
+chrome.storage.onChanged.addListener((cambios, area) => {
+  if (area !== "local" || !cambios.avocActiva) return;
+  actualizarIcono(cambios.avocActiva.newValue !== false);
+});
 
 // Abrir los PDF en nuestro visor (visor.html), donde el texto es seleccionable
 // y el traductor funciona igual que en una página web. El visor de PDF nativo
