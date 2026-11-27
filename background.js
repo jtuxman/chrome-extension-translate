@@ -54,11 +54,80 @@ abrirPanelAlClic();
 
 chrome.runtime.onInstalled.addListener((detalle) => {
   abrirPanelAlClic();
+  configurarRedireccionPdf();
   sincronizarDrive().catch((error) => console.warn("Drive:", error));
   if (detalle && (detalle.reason === "install" || detalle.reason === "update")) {
     recargarPestanaActual().catch((error) => console.warn("Recarga:", error));
   }
 });
+
+chrome.runtime.onStartup.addListener(configurarRedireccionPdf);
+
+// Abrir los PDF en nuestro visor (visor.html), donde el texto es seleccionable
+// y el traductor funciona igual que en una página web. El visor de PDF nativo
+// de Chrome no deja leer la selección desde la extensión.
+const REGLA_PDF_HTTP = 1;
+const REGLA_PDF_FILE = 2;
+const REGLA_PDF_TIPO = 3;
+
+async function configurarRedireccionPdf() {
+  if (!chrome.declarativeNetRequest || !chrome.declarativeNetRequest.updateDynamicRules) {
+    return;
+  }
+  const visor = chrome.runtime.getURL("visor.html");
+  try {
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [REGLA_PDF_HTTP, REGLA_PDF_FILE, REGLA_PDF_TIPO],
+      addRules: [
+        // 1) URLs que terminan en .pdf (se redirigen antes de la petición).
+        {
+          id: REGLA_PDF_HTTP,
+          priority: 1,
+          action: {
+            type: "redirect",
+            redirect: { regexSubstitution: visor + "?archivo=\\1" },
+          },
+          condition: {
+            regexFilter: "^(https?://[^#]*\\.[pP][dD][fF]([?#].*)?)$",
+            resourceTypes: ["main_frame"],
+          },
+        },
+        // 2) Archivos locales .pdf (requiere "Permitir acceso a URL de archivos").
+        {
+          id: REGLA_PDF_FILE,
+          priority: 1,
+          action: {
+            type: "redirect",
+            redirect: { regexSubstitution: visor + "?archivo=\\1" },
+          },
+          condition: {
+            regexFilter: "^(file://[^#]*\\.[pP][dD][fF]([?#].*)?)$",
+            resourceTypes: ["main_frame"],
+          },
+        },
+        // 3) Cualquier página cuyo contenido sea un PDF (aunque la URL no
+        // termine en .pdf). Se evalúa al recibir las cabeceras de respuesta.
+        {
+          id: REGLA_PDF_TIPO,
+          priority: 1,
+          action: {
+            type: "redirect",
+            redirect: { regexSubstitution: visor + "?archivo=\\1" },
+          },
+          condition: {
+            regexFilter: "^(https?://[^#]*)$",
+            resourceTypes: ["main_frame"],
+            responseHeaders: [
+              { header: "content-type", values: ["application/pdf*", "application/x-pdf*"] },
+            ],
+          },
+        },
+      ],
+    });
+  } catch (error) {
+    console.warn("No se pudo configurar la redirección de PDF:", error);
+  }
+}
 
 function esPaginaNormal(url) {
   return /^https?:/i.test(url || "") || /^file:/i.test(url || "");

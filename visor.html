@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lector de PDF</title>
+    <link rel="stylesheet" href="visor.css" />
+    <link rel="stylesheet" href="content.css" />
+  </head>
+  <body>
+    <header class="barra">
+      <span id="titulo" class="titulo">PDF</span>
+      <div class="controles">
+        <button id="menos" class="btn-zoom" type="button" title="Alejar">−</button>
+        <span id="zoom" class="zoom">130%</span>
+        <button id="mas" class="btn-zoom" type="button" title="Acercar">+</button>
+        <button id="imprimir" class="btn-barra" type="button" title="Imprimir el PDF">
+          Imprimir
+        </button>
+        <a id="abrir" class="abrir" href="#" target="_blank" rel="noreferrer">
+          Abrir original
+        </a>
+      </div>
+    </header>
+
+    <div id="estado" class="estado">Cargando PDF…</div>
+    <div id="paginas" class="paginas"></div>
+
+    <!-- El traductor de selección (burbuja) reutilizado en el visor. -->
+    <script src="content.js"></script>
+    <script type="module" src="visor.js"></script>
+  </body>
+</html>
